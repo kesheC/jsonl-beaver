@@ -1,0 +1,47 @@
+{
+  "name": "jsonl-beaver",
+  "version": "0.1.0",
+  "description": "jlb — streaming JSONL log analytics. Zero-dependency CLI for gigabyte NDJSON logs.",
+  "type": "module",
+  "bin": {
+    "jlb": "./dist/cli.js"
+  },
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "dev": "node --experimental-strip-types src/cli.ts"
+  },
+  "keywords": [
+    "jsonl",
+    "ndjson",
+    "log",
+    "cli",
+    "streaming",
+    "jq",
+    "analytics",
+    "zero-dependency"
+  ],
+  "license": "MIT",
+  "devDependencies": {
+    "@types/node": "^22.10.2",
+    "typescript": "^5.7.2",
+    "vitest": "^2.1.8"
+  }
+}

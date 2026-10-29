@@ -1,0 +1,8 @@
+* text=auto eol=lf
+
+# Keep the committed shell/JS/TS files LF so CI on both runners agrees.
+*.ts text eol=lf
+*.json text eol=lf
+*.yml text eol=lf
+*.md text eol=lf
+*.js text eol=lf
