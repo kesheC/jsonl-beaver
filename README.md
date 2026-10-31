@@ -24,8 +24,9 @@ lets you filter and aggregate in one shot. That is `jlb`.
 
 ## Install
 
-`jsonl-beaver` is **not published to the npm registry** — that name belongs to an
-unrelated package. Each release ships a tarball you can install directly:
+`jsonl-beaver` is **not published to the npm registry.** The name is still free;
+this project just has no publishing credentials yet. Each release ships a tarball
+you can install directly:
 
 ```bash
 npm install -g https://github.com/kesheC/jsonl-beaver/releases/latest/download/jsonl-beaver.tgz
@@ -468,7 +469,7 @@ MIT — see [LICENSE](LICENSE). Copyright (c) 2026 kesheC.
 
 ## 安装
 
-`jsonl-beaver` **没有发布到 npm registry**（那个名字属于另一个不相干的包）。
+`jsonl-beaver` **没有发布到 npm registry**。这个名字目前还是空的，只是本项目还没有发布凭据。
 每个 release 都附带可直接安装的 tarball：
 
 ```bash
