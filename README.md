@@ -28,7 +28,7 @@ lets you filter and aggregate in one shot. That is `jlb`.
 unrelated package. Each release ships a tarball you can install directly:
 
 ```bash
-npm install -g https://github.com/kesheC/jsonl-beaver/releases/download/v0.1.1/jsonl-beaver-0.1.1.tgz
+npm install -g https://github.com/kesheC/jsonl-beaver/releases/latest/download/jsonl-beaver.tgz
 jlb --version
 ```
 
@@ -460,7 +460,7 @@ MIT — see [LICENSE](LICENSE). Copyright (c) 2026 kesheC.
 每个 release 都附带可直接安装的 tarball：
 
 ```bash
-npm install -g https://github.com/kesheC/jsonl-beaver/releases/download/v0.1.1/jsonl-beaver-0.1.1.tgz
+npm install -g https://github.com/kesheC/jsonl-beaver/releases/latest/download/jsonl-beaver.tgz
 jlb --version
 ```
 
