@@ -46,7 +46,10 @@ export interface CliResult {
  * EPIPE, the error-message shape) live in argument handling, which the library
  * functions cannot exercise — only a child process can.
  */
-export async function runCli(args: readonly string[], options: { cwd?: string; stdin?: string } = {}): Promise<CliResult> {
+export async function runCli(
+  args: readonly string[],
+  options: { cwd?: string; stdin?: string; closeStderrAfterFirstChunk?: boolean } = {},
+): Promise<CliResult> {
   if (!existsSync(CLI_PATH)) {
     throw new Error(`missing ${CLI_PATH}; run "npm run build" before "npm test"`);
   }
@@ -59,8 +62,15 @@ export async function runCli(args: readonly string[], options: { cwd?: string; s
     child.stdout.on("data", (chunk: string) => {
       stdout += chunk;
     });
+    let closed = false;
     child.stderr.on("data", (chunk: string) => {
       stderr += chunk;
+      // Simulates "jlb ... 2>&1 | head -2": the reader goes away mid-run, which
+      // turns the next stderr write into an EPIPE in the child.
+      if (options.closeStderrAfterFirstChunk === true && !closed) {
+        closed = true;
+        child.stderr.destroy();
+      }
     });
     child.on("error", reject);
     child.on("close", (code) => resolve({ code, stdout, stderr }));

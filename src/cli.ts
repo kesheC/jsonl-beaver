@@ -11,9 +11,10 @@ import process from "node:process";
 import { collectStat, runHead, runFilter, runAgg, runToCsv, runToJsonl } from "./commands.js";
 import { compileExpr, ExprError } from "./expr.js";
 import { InputError, InvalidLineError, resolveSource, STDIN_SENTINEL } from "./stream.js";
-import { openOutputSink, OutputError, type OutputSink } from "./output.js";
+import { discardOpenTempFiles, installPipeGuard, openOutputSink, OutputError, type OutputSink } from "./output.js";
 import { formatBytes, formatCount, prettyJson, renderStat, renderAgg, compactJson, flattenForCsv } from "./format.js";
 import { ArgError, parseArgs, parseInteger, type OptionSpec } from "./args.js";
+import { parsePath } from "./path.js";
 import { VERSION } from "./index.js";
 
 const GLOBAL_OPTIONS: OptionSpec[] = [
@@ -206,6 +207,16 @@ function validateForCommand(
   if (command === "to-csv" || command === "to-jsonl") {
     fields = parseFieldList(parsed.values.get("fields"));
     if (fields.length === 0) throw new ArgError(`${command}: --fields a,b,c is required`);
+    // Same check --by gets. Without it a typo like "a..b" silently becomes a
+    // literal CSV header and every row comes out empty.
+    for (const field of fields) {
+      if (parsePath(field) === null) throw new ArgError(`${command}: invalid --fields path: ${field}`);
+    }
+  }
+
+  const by = parsed.values.get("by");
+  if (by !== undefined && parsePath(by) === null) {
+    throw new ArgError(`invalid --by field path: ${by}`);
   }
 
   if (command === "filter" && where === undefined) {
@@ -414,12 +425,27 @@ async function main(argv: readonly string[]): Promise<number> {
 }
 
 // A downstream consumer that stops reading (`jlb filter ... | head -2`) closes
-// the pipe; Node turns that into an EPIPE error event on stdout. That is not a
-// failure of this program, so exit quietly instead of dumping a stack trace.
-process.stdout.on("error", (error: NodeJS.ErrnoException) => {
-  if (error.code === "EPIPE") process.exit(0);
-  throw error;
-});
+// the pipe; Node turns that into an EPIPE error event. Without a listener the
+// event is unhandled and kills the process, which for `-o` meant a false
+// failure plus a leftover .jlb-tmp: the run died before commit().
+//
+// stdout carries the payload, so a closed pipe means "the reader has what it
+// wants" and the run ends successfully. stderr only carries warnings and
+// progress, so an EPIPE there is swallowed and the command finishes normally.
+installPipeGuard(process.stdout, true);
+installPipeGuard(process.stderr, false);
+
+// SIGINT/SIGTERM skip the normal abort path, so the temp file has to be removed
+// here. Idempotent on purpose: both signals can arrive during the same shutdown.
+function installSignalCleanup(signal: NodeJS.Signals, exitCode: number): void {
+  process.on(signal, () => {
+    discardOpenTempFiles();
+    process.exit(exitCode);
+  });
+}
+
+installSignalCleanup("SIGINT", 130);
+installSignalCleanup("SIGTERM", 143);
 
 main(process.argv.slice(2))
   .then((code) => {

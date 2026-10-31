@@ -93,6 +93,57 @@ describe("broken pipe", () => {
   });
 });
 
+describe("closed stderr pipe", () => {
+  it("still commits the output file when the stderr reader goes away", async () => {
+    // 50 valid + 50 malformed lines: every malformed one writes to stderr, so a
+    // closed reader is guaranteed to produce an EPIPE mid-run.
+    const lines: string[] = [];
+    for (let i = 0; i < 50; i++) lines.push(JSON.stringify({ i }));
+    for (let i = 0; i < 50; i++) lines.push("{bad" + i);
+    const file = await writeText(dir, "noisy.jsonl", lines.join("\n") + "\n");
+    const target = path.join(dir, "noisy-out.csv");
+    const result = await runCli(
+      ["to-csv", "--fields", "i", "--skip-invalid", "-o", target, file],
+      { cwd: dir, closeStderrAfterFirstChunk: true },
+    );
+    expect(result.code).toBe(0);
+    const { readFile: read } = await import("node:fs/promises");
+    expect((await read(target, "utf8")).split("\n").filter((line) => line !== "")).toHaveLength(51);
+    const { readdir } = await import("node:fs/promises");
+    expect((await readdir(dir)).filter((name) => name.includes("jlb-tmp"))).toEqual([]);
+  });
+});
+
+describe("stale temp files", () => {
+  it("sweeps a leftover temp file from a dead run", async () => {
+    const { readdir, writeFile: writeF } = await import("node:fs/promises");
+    const target = path.join(dir, "swept.csv");
+    // pid 999999 does not exist, so its temp file is a crash leftover.
+    const stale = path.join(dir, ".swept.csv.zzz.abc123.jlb-tmp");
+    await writeF(stale, "junk", "utf8");
+    const result = await runCli(["to-csv", "--fields", "n", "-o", target, records], { cwd: dir });
+    expect(result.code).toBe(0);
+    expect(await readFile(target, "utf8")).toBe("n\n1\n2\n3\n");
+    expect((await readdir(dir)).filter((name) => name.includes("jlb-tmp"))).toEqual([]);
+  });
+
+  it("keeps a temp file whose owner is still running", async () => {
+    const { readdir, writeFile: writeF } = await import("node:fs/promises");
+    const target = path.join(dir, "live.csv");
+    const alivePid = process.pid.toString(36);
+    const live = path.join(dir, `.live.csv.${alivePid}.abc123.jlb-tmp`);
+    await writeF(live, "junk", "utf8");
+    try {
+      const result = await runCli(["to-csv", "--fields", "n", "-o", target, records], { cwd: dir });
+      expect(result.code).toBe(0);
+      expect(await readdir(dir)).toContain(path.basename(live));
+    } finally {
+      const { rm } = await import("node:fs/promises");
+      await rm(live, { force: true });
+    }
+  });
+});
+
 describe("malformed line reporting", () => {
   it("reports the physical line number, not the record ordinal", async () => {
     const file = await writeText(dir, "gaps.jsonl", '{"a":1}\n\n\n{oops\n');
@@ -156,6 +207,47 @@ describe("argument validation", () => {
     const result = await runCli(["stat", records, "--limit", "2"], { cwd: dir });
     expect(result.code).toBe(2);
     expect(result.stderr).toContain("--limit is not supported by stat");
+  });
+
+  it("rejects a malformed --fields path like --by does", async () => {
+    // "[0]" is deliberately absent: a bare index is a legal path into a
+    // top-level array record.
+    for (const bad of ["a..b", "", "a[x]", ".a", "a."]) {
+      const result = await runCli(["to-csv", "--fields", bad, records], { cwd: dir });
+      if (bad === "") {
+        expect(result.code).toBe(2);
+        expect(result.stderr).toContain("--fields");
+        continue;
+      }
+      expect(result.code).toBe(2);
+      expect(result.stderr).toContain("invalid --fields path");
+      expect(result.stderr).not.toContain("    at ");
+    }
+  });
+
+  it("rejects a malformed --by path with exit 2, not 1", async () => {
+    const result = await runCli(["agg", "--by", "a..b", "--count", records], { cwd: dir });
+    expect(result.code).toBe(2);
+    expect(result.stderr).toContain("invalid --by field path");
+    expect(result.stderr).not.toContain("    at ");
+  });
+
+  it("trims surrounding whitespace from the -o target", async () => {
+    const { readdir } = await import("node:fs/promises");
+    const result = await runCli(["head", "-n", "1", "-o", `${path.join(dir, "trimmed.jsonl")}  `, records], { cwd: dir });
+    expect(result.code).toBe(0);
+    expect(await readFile(path.join(dir, "trimmed.jsonl"), "utf8")).toBe('{"n":1}\n');
+    // No sibling file whose name ends in a space.
+    expect((await readdir(dir)).filter((name) => name.trim() !== name)).toEqual([]);
+  });
+
+  it("still refuses to overwrite the input once the target is trimmed", async () => {
+    const file = await writeText(dir, "trimin.jsonl", '{"n":1}\n{"n":2}\n');
+    const before = await readFile(file, "utf8");
+    const result = await runCli(["head", "-n", "1", "-o", `${file} `, file], { cwd: dir });
+    expect(result.code).toBe(2);
+    expect(result.stderr).toContain("refusing to write to the input file");
+    expect(await readFile(file, "utf8")).toBe(before);
   });
 
   it("rejects an unknown command before touching the output file", async () => {
