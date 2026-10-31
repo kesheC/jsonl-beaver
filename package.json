@@ -27,7 +27,7 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "dev": "node --experimental-strip-types src/cli.ts",
-    "prepare": "npm run build"
+    "prepack": "npm run build"
   },
   "keywords": [
     "jsonl",

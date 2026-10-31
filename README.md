@@ -43,8 +43,9 @@ npm ci && npm run build && npm link
 Requires Node >= 20.11. **Zero runtime dependencies** — everything is built on the
 Node standard library.
 
-> Avoid `npm install -g git+https://github.com/...`: on npm 11 a global install
-> skips `devDependencies`, so the `prepare` build cannot find `tsc`.
+> Avoid `npm install -g git+https://github.com/...`: the checkout has no build
+> output and a global install skips `devDependencies`, so there is no `tsc` to
+> build it with.
 
 ---
 
