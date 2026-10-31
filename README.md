@@ -4,7 +4,7 @@
 **几个 G 的 JSONL 日志，不用再写一次性的 jq 管道。**
 
 [![CI](https://github.com/kesheC/jsonl-beaver/actions/workflows/ci.yml/badge.svg)](https://github.com/kesheC/jsonl-beaver/actions/workflows/ci.yml)
-[![npm](https://img.shields.io/npm/v/jsonl-beaver.svg)](https://www.npmjs.com/package/jsonl-beaver)
+[![Release](https://img.shields.io/github/v/release/kesheC/jsonl-beaver?color=blue)](https://github.com/kesheC/jsonl-beaver/releases)
 [![license](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 [![dependencies](https://img.shields.io/badge/runtime%20dependencies-0-brightgreen.svg)](#faq--boundaries)
 
@@ -24,12 +24,27 @@ lets you filter and aggregate in one shot. That is `jlb`.
 
 ## Install
 
+`jsonl-beaver` is **not published to the npm registry** — that name belongs to an
+unrelated package. Each release ships a tarball you can install directly:
+
 ```bash
-npm install -g jsonl-beaver
+npm install -g https://github.com/kesheC/jsonl-beaver/releases/download/v0.1.1/jsonl-beaver-0.1.1.tgz
+jlb --version
 ```
 
-Requires Node >= 20. **Zero runtime dependencies** — everything is built on the
+Or build it from a checkout:
+
+```bash
+git clone https://github.com/kesheC/jsonl-beaver.git
+cd jsonl-beaver
+npm ci && npm run build && npm link
+```
+
+Requires Node >= 20.11. **Zero runtime dependencies** — everything is built on the
 Node standard library.
+
+> Avoid `npm install -g git+https://github.com/...`: on npm 11 a global install
+> skips `devDependencies`, so the `prepare` build cannot find `tsc`.
 
 ---
 
@@ -417,11 +432,23 @@ MIT — see [LICENSE](LICENSE). Copyright (c) 2026 kesheC.
 
 ## 安装
 
+`jsonl-beaver` **没有发布到 npm registry**（那个名字属于另一个不相干的包）。
+每个 release 都附带可直接安装的 tarball：
+
 ```bash
-npm install -g jsonl-beaver
+npm install -g https://github.com/kesheC/jsonl-beaver/releases/download/v0.1.1/jsonl-beaver-0.1.1.tgz
+jlb --version
 ```
 
-需要 Node >= 20。**零运行时依赖** —— 只用 Node 标准库。
+或者从源码自己编译：
+
+```bash
+git clone https://github.com/kesheC/jsonl-beaver.git
+cd jsonl-beaver
+npm ci && npm run build && npm link
+```
+
+需要 Node >= 20.11。**零运行时依赖** —— 只用 Node 标准库。
 
 ## 60 秒上手
 

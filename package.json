@@ -1,6 +1,6 @@
 {
   "name": "jsonl-beaver",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "jlb — streaming JSONL log analytics. Zero-dependency CLI for gigabyte NDJSON logs.",
   "type": "module",
   "bin": {
@@ -20,7 +20,7 @@
     "LICENSE"
   ],
   "engines": {
-    "node": ">=20"
+    "node": ">=20.11"
   },
   "scripts": {
     "build": "tsc -p tsconfig.build.json",

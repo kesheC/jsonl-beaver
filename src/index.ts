@@ -73,4 +73,4 @@ export {
 } from "./commands.js";
 
 /** Package version, kept in sync with package.json by `npm version`. */
-export const VERSION = "0.1.0";
+export const VERSION = "0.1.1";
