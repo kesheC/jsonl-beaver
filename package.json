@@ -27,6 +27,8 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "dev": "node --experimental-strip-types src/cli.ts",
+    "demo": "node demo/make-access-log.mjs",
+    "bench": "node demo/make-bench.mjs",
     "prepack": "npm run build"
   },
   "keywords": [

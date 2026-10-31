@@ -4,3 +4,6 @@ dist/
 .tmp/
 coverage/
 *.log
+demo/access.jsonl
+bench-*.jsonl
+*.bench.jsonl
