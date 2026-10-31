@@ -47,7 +47,37 @@ jobs:
           npm pack
           TARBALL=$(ls jsonl-beaver-*.tgz | head -n 1)
           if [ ! -f "$TARBALL" ]; then echo "npm pack produced nothing" >&2; exit 1; fi
-          mkdir -p /tmp/smoke && cd /tmp/smoke
+
+          # --- package contents ---
+          # Run from the repo root, before any `cd`: `npm pack` packs the
+          # package in the current directory, so doing this after moving to a
+          # throwaway directory would inspect that empty package instead of
+          # ours and always pass.
+          npm pack --dry-run --json > pack-meta.json
+          node -e "
+          const fs = require('fs');
+          const meta = JSON.parse(fs.readFileSync('pack-meta.json', 'utf8'));
+          const files = meta[0].files.map((f) => f.path);
+          const dist = files.filter((p) => p.startsWith('dist/'));
+          const problems = [];
+          if (!files.includes('dist/index.js')) problems.push('dist/index.js is missing from the tarball');
+          if (!files.includes('dist/cli.js')) problems.push('dist/cli.js is missing from the tarball');
+          if (!files.includes('dist/index.d.ts')) problems.push('dist/index.d.ts is missing, so the types do not ship');
+          if (dist.length === 0) problems.push('the tarball has no dist/ entries at all');
+          for (const bad of ['tests/', 'src/', 'node_modules/']) {
+            if (files.some((p) => p.startsWith(bad))) problems.push('the tarball leaks ' + bad);
+          }
+          if (files.some((p) => p.endsWith('.js.map'))) problems.push('the tarball ships .js.map files that point at sources it does not contain');
+          if (problems.length > 0) { console.error(problems.join('\n')); process.exit(1); }
+          console.log('package contents ok: ' + files.length + ' entries, ' + dist.length + ' under dist/');
+          "
+
+          # --- the installed artifact ---
+          # Install into a throwaway directory and run every assertion from
+          # there, so node resolves "jsonl-beaver" to node_modules/jsonl-beaver
+          # (the packed artifact) and never to the checkout.
+          SMOKE=$(mktemp -d)
+          cd "$SMOKE"
           npm init -y > /dev/null
           npm install "$GITHUB_WORKSPACE/$TARBALL"
           # Compare against package.json, not just "did it exit 0": a broken
@@ -56,3 +86,24 @@ jobs:
           actual=$(./node_modules/.bin/jlb --version)
           echo "jlb --version = $actual (expected $expected)"
           [ "$actual" = "$expected" ] || { echo "version mismatch" >&2; exit 1; }
+
+          # The CLI working says nothing about the library. Import the packed
+          # entry point and assert the public surface is actually reachable.
+          # Every name below is exported by src/index.ts; a broken exports map
+          # or a missing dist file fails here rather than on a user's machine.
+          node --input-type=module -e "
+          const m = await import('jsonl-beaver');
+          const names = Object.keys(m);
+          if (names.length === 0) { console.error('jsonl-beaver exports nothing'); process.exit(1); }
+          for (const required of ['collectStat', 'runHead', 'runFilter', 'runAgg', 'runToCsv', 'runToJsonl', 'streamJsonl', 'compileExpr', 'toCsv', 'renderStat', 'openOutputSink']) {
+            if (typeof m[required] !== 'function') {
+              console.error('missing library export: ' + required);
+              process.exit(1);
+            }
+          }
+          if (typeof m.VERSION !== 'string' || m.VERSION.length === 0) {
+            console.error('missing library export: VERSION (expected a non-empty string)');
+            process.exit(1);
+          }
+          console.log('library import ok, ' + names.length + ' exports');
+          "

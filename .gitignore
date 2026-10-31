@@ -7,3 +7,4 @@ coverage/
 demo/access.jsonl
 bench-*.jsonl
 *.bench.jsonl
+pack-meta.json
