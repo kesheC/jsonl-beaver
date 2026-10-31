@@ -275,6 +275,34 @@ argument if you want what the CLI emits.
 renames it into place only after the command succeeded. A wrong flag, a missing input
 or a `--where` that does not compile therefore leaves an existing file untouched —
 and `jlb head -o data.jsonl data.jsonl` is refused instead of truncating its own input.
+Surrounding whitespace on the `-o` value is trimmed first, so `-o "out.csv "` writes
+`out.csv` and still hits the self-overwrite guard.
+
+Because the work goes to a temp file, an interrupted run can leave one behind. `jlb`
+tracks every temp file it opens and deletes them on `SIGINT` / `SIGTERM`. Windows
+terminates a process without running JavaScript, so for a hard kill the next run with
+the same `-o` sweeps any leftover whose owning pid is no longer alive — a temp file
+belonging to a concurrently running `jlb` is left strictly alone:
+
+```text
+$ touch .out.csv.zzzzz.abc123.jlb-tmp   # pid 60466175 in base36: not running
+$ jlb head d.jsonl -n 1 -o out.csv
+$ ls -a | grep -c jlb-tmp
+0
+```
+
+A consumer that quits early does not turn into a failure either. Piping into `head`
+closes the writing side of the pipe; `jlb` treats that as "the reader has what it
+wanted", finishes the file it was asked to write, and exits 0:
+
+```text
+$ jlb to-csv half.jsonl --fields n --skip-invalid -o out.csv 2>&1 | head -1
+jlb: skipping line 2: Unexpected token 'o', "not json" is not valid JSON
+$ echo ${PIPESTATUS[0]}   # the writer, not head
+0
+$ wc -l < out.csv
+51
+```
 
 ### Global options
 
@@ -287,6 +315,13 @@ and `jlb head -o data.jsonl data.jsonl` is refused instead of truncating its own
 | `--top N` | Rows in `stat` (fields) / `agg` (groups) output, must be >= 1 |
 | `--out FILE` | Write output to a file instead of stdout |
 | `--quiet` | Suppress the summary footer |
+
+`--fields` is split on commas and trimmed. Empty segments are dropped, so
+`--fields a,,b` and `--fields a,b,` both select the same two fields — a stray comma
+is a typo, not a request for an unnamed column. A value with nothing left in it
+(`--fields ""`, `--fields "   "`, `--fields ",,"`) is rejected with exit 2. An
+otherwise-valid list is still checked segment by segment, so `--fields a..b` fails
+with `invalid --fields path` instead of printing a bogus column header.
 
 ### Reading from stdin
 
@@ -703,6 +738,32 @@ CSV 输出遵循 RFC 4180：逗号、引号、换行都会被转义，内嵌引�
 `-o FILE` 是原子写入：`jlb` 先在目标旁边建临时文件，命令成功后才 rename 覆盖目标。
 因此参数写错、输入文件不存在、`--where` 编译失败都不会破坏已有的输出文件；
 `jlb head -o data.jsonl data.jsonl` 会被直接拒绝，而不是把自己的输入截断成空文件。
+`-o` 两侧的空白会先被裁掉，所以 `-o "out.csv "` 写的是 `out.csv`，也照样会走
+自覆盖保护。
+
+正因为真正的写入发生在临时文件上，一次被打断的运行可能留下残留。`jlb` 会记录自己
+打开过的每个临时文件，并在 `SIGINT` / `SIGTERM` 时删掉它们。Windows 结束进程时
+不会执行任何 JavaScript，所以对硬杀的情况，下一次用同一个 `-o` 运行时，会清理掉
+属主进程已经不在的残留——而属于另一个仍在运行的 `jlb` 的临时文件绝不会被碰：
+
+```text
+$ touch .out.csv.zzzzz.abc123.jlb-tmp   # 60466175 的 36 进制，该进程并不存在
+$ jlb head d.jsonl -n 1 -o out.csv
+$ ls -a | grep -c jlb-tmp
+0
+```
+
+下游消费者提前退出也不会被当成失败。管道接 `head` 时写端会被关闭，`jlb` 把这种
+情况理解为"读取方已经拿到它要的东西"，于是把自己被要求写的文件写完，然后以 0 退出：
+
+```text
+$ jlb to-csv half.jsonl --fields n --skip-invalid -o out.csv 2>&1 | head -1
+jlb: skipping line 2: Unexpected token 'o', "not json" is not valid JSON
+$ echo ${PIPESTATUS[0]}   # 这是写端的状态，不是 head 的
+0
+$ wc -l < out.csv
+51
+```
 
 ### 全局参数
 
@@ -715,6 +776,12 @@ CSV 输出遵循 RFC 4180：逗号、引号、换行都会被转义，内嵌引�
 | `--top N` | `stat`（字段）/ `agg`（分组）输出的行数，必须 >= 1 |
 | `--out FILE` | 输出写入文件而不是 stdout |
 | `--quiet` | 关闭汇总提示 |
+
+`--fields` 按逗号切分并逐段 trim。空段会被丢弃，所以 `--fields a,,b` 和
+`--fields a,b,` 选的是同样两个字段——多打一个逗号是手误，不是在要一个无名列。
+全部为空的值（`--fields ""`、`--fields "   "`、`--fields ",,"`）会以 exit 2 拒绝。
+非空的列表仍然逐段校验，所以 `--fields a..b` 报 `invalid --fields path`，
+而不是把错误的列名直接打出来。
 
 ### 从 stdin 读取
 

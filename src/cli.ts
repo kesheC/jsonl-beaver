@@ -151,6 +151,16 @@ async function readWhere(parsed: ReturnType<typeof parseArgs>): Promise<string |
   return inline;
 }
 
+/**
+ * Split a `--fields` value.
+ *
+ * Empty segments are dropped on purpose, not by accident: `--fields a,,b` and
+ * `--fields a,b,` both mean `a,b`. A doubled or trailing comma is the most
+ * common way to mistype a list, and an empty name is never a field anyone can
+ * read from a record, so rejecting the whole invocation would only cost the
+ * user a round trip. An all-empty value (`--fields ""`, `--fields "   "`,
+ * `--fields ",,"`) is still an error: there is nothing left to select.
+ */
 function parseFieldList(raw: string | undefined): string[] {
   if (raw === undefined) return [];
   const fields = raw.split(",").map((f) => f.trim()).filter((f) => f !== "");
