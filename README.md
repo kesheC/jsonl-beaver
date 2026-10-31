@@ -431,6 +431,12 @@ operations you run every day, with a memory ceiling you can predict.
 
 ---
 
+## Security and changes
+
+Found a vulnerability? Please do not open a public issue — [SECURITY.md](SECURITY.md)
+explains the private reporting channel and what to include. Every release is written
+up in [CHANGELOG.md](CHANGELOG.md).
+
 ## License
 
 MIT — see [LICENSE](LICENSE). Copyright (c) 2026 kesheC.
@@ -806,6 +812,11 @@ const { groups } = await runAgg("demo/access.jsonl", { by: "path", sum: "bytes",
 **为什么不用 `jq`？** `jq` 做临时查询非常好用，但它默认不流式、没有分位数聚合，
 而且过滤语言需要真正花时间学。`jlb` 用通用表达力换取日志场景里每天都要用的
 那几个操作，并给出一个可预测的内存上限。
+
+## 安全与变更
+
+发现安全问题请**不要**开公开 issue —— [SECURITY.md](SECURITY.md) 说明了私密上报渠道以及
+需要提供哪些信息。每个版本的改动都记在 [CHANGELOG.md](CHANGELOG.md)。
 
 ## 许可证
 
