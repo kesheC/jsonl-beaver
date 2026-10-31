@@ -155,7 +155,13 @@ export function renderStat(stat: StatResult, topFields = 30): string {
   lines.push(`  p50 ${formatCount(stat.lengthP50)}   p95 ${formatCount(stat.lengthP95)}   max ${formatCount(stat.lengthMax)}`);
   lines.push("");
   if (stat.fields.length === 0) {
+    // Two very different reasons for an empty field list. Saying "no
+    // top-level object records" when the user asked for --top 0 is a lie.
     lines.push("Fields: none (no top-level object records)");
+    return lines.join("\n");
+  }
+  if (topFields <= 0) {
+    lines.push(`Top fields: none requested (${formatCount(stat.fieldCount)} field(s) present)`);
     return lines.join("\n");
   }
   lines.push(`Top fields (${Math.min(topFields, stat.fields.length)} of ${stat.fieldCount})`);

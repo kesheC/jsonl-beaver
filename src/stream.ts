@@ -57,7 +57,7 @@ export interface StreamOptions {
 }
 
 export interface StreamStats {
-  /** Physical lines seen, excluding a trailing empty line. */
+  /** Non-blank lines seen (blank lines are skipped and never counted). */
   total: number;
   /** Lines that parsed into a JSON value. */
   valid: number;
@@ -133,8 +133,14 @@ export async function streamJsonl(
   const stream = openStream(input, stdin);
   const interface_ = createInterface({ input: stream, crlfDelay: Infinity, terminal: false });
 
+  // Physical line number, counted before the blank-line skip so a message about
+  // "line N" points at the line you would see in an editor, not at the Nth
+  // record (which drifts as soon as the file contains blank or skipped lines).
+  let physical = 0;
+
   try {
     for await (const rawLine of interface_) {
+      physical++;
       const line = rawLine.charCodeAt(0) === 0xfeff ? rawLine.slice(1) : rawLine;
       if (line.trim() === "") continue;
 
@@ -148,14 +154,14 @@ export async function streamJsonl(
         parsed = JSON.parse(line);
       } catch (error) {
         stats.invalid++;
-        const bad: BadLine = { line: stats.total, excerpt: excerptOf(line), reason: describeParseError(error) };
+        const bad: BadLine = { line: physical, excerpt: excerptOf(line), reason: describeParseError(error) };
         if (onBadLine) onBadLine(bad);
         if (!skipInvalid) throw new InvalidLineError(bad);
         continue;
       }
 
       stats.valid++;
-      await onRecord(parsed, stats.total, line);
+      await onRecord(parsed, physical, line);
     }
   } finally {
     // readline closes on 'close'; destroy explicitly so an aborted early exit

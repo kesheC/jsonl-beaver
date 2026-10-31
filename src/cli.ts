@@ -10,7 +10,8 @@
 import process from "node:process";
 import { collectStat, runHead, runFilter, runAgg, runToCsv, runToJsonl } from "./commands.js";
 import { compileExpr, ExprError } from "./expr.js";
-import { InputError, InvalidLineError } from "./stream.js";
+import { InputError, InvalidLineError, resolveSource, STDIN_SENTINEL } from "./stream.js";
+import { openOutputSink, OutputError, type OutputSink } from "./output.js";
 import { formatBytes, formatCount, prettyJson, renderStat, renderAgg, compactJson, flattenForCsv } from "./format.js";
 import { ArgError, parseArgs, parseInteger, type OptionSpec } from "./args.js";
 import { VERSION } from "./index.js";
@@ -56,8 +57,8 @@ Common options:
       --skip-invalid    Skip malformed lines instead of failing on the first one
       --json            Machine-readable JSON on stdout instead of a table
       --progress        Print a progress tick to stderr every 1M lines
-  -l, --limit <n>       Stop after n matching records
-  -t, --top <n>         Rows in stat (fields) / agg (groups) output
+  -l, --limit <n>       Stop after n records (filter, to-csv, to-jsonl only)
+  -t, --top <n>         Rows in stat (fields) / agg (groups) output, >= 1
   -o, --out <file>      Write output to a file instead of stdout
       --quiet           Suppress the summary footer
 
@@ -108,13 +109,26 @@ function progressWriter(enabled: boolean): NodeJS.WritableStream | undefined {
   return enabled ? process.stderr : undefined;
 }
 
-function reportBadLine(bad: { line: number; excerpt: string; reason: string }, quiet: boolean, json: boolean): void {
+function reportBadLine(
+  bad: { line: number; excerpt: string; reason: string },
+  quiet: boolean,
+  json: boolean,
+  skipping: boolean,
+): void {
   if (quiet) return;
+  // Without --skip-invalid the run aborts and `main().catch` prints the error
+  // (with the hint about --skip-invalid); printing here as well would double
+  // every malformed line.
+  if (!skipping) return;
   if (json) {
-    process.stderr.write(`${compactJson({ level: "warn", type: "invalid-line", line: bad.line, reason: bad.reason, excerpt: bad.excerpt })}\n`);
+    process.stderr.write(
+      `${compactJson({ level: "warn", type: "invalid-line", line: bad.line, reason: bad.reason, excerpt: bad.excerpt, skipped: skipping })}\n`,
+    );
     return;
   }
-  process.stderr.write(`jlb: skipping line ${bad.line}: ${bad.reason}\n`);
+  // The wording has to match what actually happens next: without
+  // --skip-invalid the run aborts, so "skipping" would be a lie.
+  process.stderr.write(`jlb: ${skipping ? "skipping" : "malformed"} line ${bad.line}: ${bad.reason}\n`);
   process.stderr.write(`     ${bad.excerpt}\n`);
 }
 
@@ -141,6 +155,72 @@ function parseFieldList(raw: string | undefined): string[] {
   const fields = raw.split(",").map((f) => f.trim()).filter((f) => f !== "");
   if (fields.length === 0) throw new ArgError("--fields needs at least one field name");
   return fields;
+}
+
+const LIMIT_COMMANDS = new Set(["filter", "to-csv", "to-jsonl"]);
+
+interface CommandConfig {
+  lines: number;
+  fields: string[];
+}
+
+/**
+ * Run every check that can reject the invocation, before any output file is
+ * opened. Keeping this separate from the dispatch is what makes `-o` safe:
+ * a bad flag combination, a missing input or a malformed --where all exit 2
+ * with the target file untouched.
+ */
+function validateForCommand(
+  command: string,
+  parsed: ReturnType<typeof parseArgs>,
+  flags: GlobalFlags,
+  where: string | undefined,
+): CommandConfig {
+  switch (command) {
+    case "stat":
+    case "head":
+    case "filter":
+    case "agg":
+    case "to-csv":
+    case "to-jsonl":
+      break;
+    default:
+      throw new ArgError(`unknown command: ${command} (try jlb --help)`);
+  }
+
+  // --limit only means something where records are streamed out one by one.
+  // Silently ignoring it elsewhere would look like it worked.
+  if (flags.limit !== undefined && !LIMIT_COMMANDS.has(command)) {
+    throw new ArgError(`--limit is not supported by ${command}; it applies to filter, to-csv and to-jsonl`);
+  }
+  if (flags.limit !== undefined && flags.limit < 0) throw new ArgError("--limit must be >= 0");
+  // A non-positive --top used to mean "all rows" in one place and "no fields"
+  // in another, which then printed a misleading empty-fields report.
+  if (flags.top !== undefined && flags.top < 1) throw new ArgError("--top must be >= 1");
+
+  const rawLines = parsed.values.get("lines");
+  const lines = rawLines !== undefined ? parseInteger(rawLines, "lines") : 10;
+  if (lines < 0) throw new ArgError("--lines must be >= 0");
+
+  let fields: string[] = [];
+  if (command === "to-csv" || command === "to-jsonl") {
+    fields = parseFieldList(parsed.values.get("fields"));
+    if (fields.length === 0) throw new ArgError(`${command}: --fields a,b,c is required`);
+  }
+
+  if (command === "filter" && where === undefined) {
+    throw new ArgError("filter: --where <expr> is required");
+  }
+
+  if (command === "agg") {
+    const metrics = ["sum", "avg", "p95"].filter((name) => parsed.values.get(name) !== undefined);
+    if (metrics.length > 1) throw new ArgError("agg: pick at most one of --sum / --avg / --p95");
+    if (parsed.values.get("by") === undefined && metrics.length === 0 && !parsed.flags.has("count")) {
+      throw new ArgError("agg: nothing to compute - pass --count, --sum, --avg or --p95");
+    }
+  }
+
+  return { lines, fields };
 }
 
 async function main(argv: readonly string[]): Promise<number> {
@@ -178,18 +258,27 @@ async function main(argv: readonly string[]): Promise<number> {
     skipInvalid: flags.skipInvalid,
     progressEvery: flags.progress ? 1_000_000 : 0,
     progressSink: process.stderr,
-    onBadLine: (bad: import("./stream.js").BadLine) => reportBadLine(bad, quiet, flags.json),
+    onBadLine: (bad: import("./stream.js").BadLine) => reportBadLine(bad, quiet, flags.json, flags.skipInvalid),
   };
-
   const outPath = parsed.values.get("out");
-  const sink = outPath !== undefined ? (await import("node:fs")).createWriteStream(outPath, { encoding: "utf8" }) : null;
-  const write = (text: string): void => {
-    if (sink !== null) sink.write(text);
-    else process.stdout.write(text);
-  };
 
+  // ---- Validation phase ---------------------------------------------------
+  // Everything that can be rejected is rejected here, before the output file
+  // is opened. Opening `-o` first is what used to truncate the target when a
+  // later argument or the input file turned out to be wrong.
+  const config = validateForCommand(command, parsed, flags, where);
+  const source = await resolveSource(input);
+  // Compile the filter once, too: a bad --where must not create the file.
+  const predicate = where === undefined ? undefined : compileExpr(where);
+
+  // ---- Write phase --------------------------------------------------------
+  const sink: OutputSink = await openOutputSink(outPath, source);
+  const write = (text: string): void => sink.write(text);
+
+  let code = 0;
   try {
-    switch (command) {
+    code = await (async (): Promise<number> => {
+      switch (command) {
       case "stat": {
         const stat = await collectStat(input, { ...common, topFields: flags.top ?? 30 });
         if (flags.json) {
@@ -201,10 +290,7 @@ async function main(argv: readonly string[]): Promise<number> {
       }
 
       case "head": {
-        const rawCount = parsed.values.get("lines");
-        const count = rawCount !== undefined ? parseInteger(rawCount, "lines") : 10;
-        if (count < 0) throw new ArgError("--lines must be >= 0");
-        const result = await runHead(input, count, {
+        const result = await runHead(input, config.lines, {
           ...common,
           emit: (record) => {
             write((flags.pretty ? prettyJson(record) : compactJson(record)) + "\n");
@@ -217,11 +303,9 @@ async function main(argv: readonly string[]): Promise<number> {
       }
 
       case "filter": {
-        if (where === undefined) throw new ArgError("filter: --where <expr> is required");
-        const predicate = compileExpr(where);
         const result = await runFilter(input, {
           ...common,
-          whereNode: predicate,
+          whereNode: predicate!,
           limit: flags.limit,
           emit: (record) => {
             write((flags.pretty ? prettyJson(record) : compactJson(record)) + "\n");
@@ -240,11 +324,6 @@ async function main(argv: readonly string[]): Promise<number> {
         const sum = parsed.values.get("sum");
         const avg = parsed.values.get("avg");
         const p95 = parsed.values.get("p95");
-        const metricCount = [sum, avg, p95].filter((v) => v !== undefined).length;
-        if (metricCount > 1) throw new ArgError("agg: pick at most one of --sum / --avg / --p95");
-        if (by === undefined && metricCount === 0 && !parsed.flags.has("count")) {
-          throw new ArgError("agg: nothing to compute — pass --count, --sum, --avg or --p95");
-        }
         const result = await runAgg(input, {
           ...common,
           by,
@@ -295,11 +374,9 @@ async function main(argv: readonly string[]): Promise<number> {
       }
 
       case "to-csv": {
-        const fields = parseFieldList(parsed.values.get("fields"));
-        if (fields.length === 0) throw new ArgError("to-csv: --fields a,b,c is required");
         const result = await runToCsv(input, {
           ...common,
-          fields,
+          fields: config.fields,
           where,
           limit: flags.limit,
           emit: (line) => write(line + "\n"),
@@ -309,11 +386,9 @@ async function main(argv: readonly string[]): Promise<number> {
       }
 
       case "to-jsonl": {
-        const fields = parseFieldList(parsed.values.get("fields"));
-        if (fields.length === 0) throw new ArgError("to-jsonl: --fields a,b,c is required");
         const result = await runToJsonl(input, {
           ...common,
-          fields,
+          fields: config.fields,
           where,
           limit: flags.limit,
           pretty: flags.pretty,
@@ -325,13 +400,26 @@ async function main(argv: readonly string[]): Promise<number> {
 
       default:
         throw new ArgError(`unknown command: ${command} (try jlb --help)`);
-    }
-  } finally {
-    if (sink !== null) {
-      await new Promise<void>((resolve) => sink.end(resolve));
-    }
+      }
+    })();
+  } catch (error) {
+    // Discard the partial temp file. The target keeps whatever it had.
+    await sink.abort();
+    throw error;
   }
+
+  // Only now does the temp file replace the target.
+  await sink.commit();
+  return code;
 }
+
+// A downstream consumer that stops reading (`jlb filter ... | head -2`) closes
+// the pipe; Node turns that into an EPIPE error event on stdout. That is not a
+// failure of this program, so exit quietly instead of dumping a stack trace.
+process.stdout.on("error", (error: NodeJS.ErrnoException) => {
+  if (error.code === "EPIPE") process.exit(0);
+  throw error;
+});
 
 main(process.argv.slice(2))
   .then((code) => {
@@ -348,7 +436,7 @@ main(process.argv.slice(2))
       process.exitCode = 2;
       return;
     }
-    if (error instanceof InputError) {
+    if (error instanceof InputError || error instanceof OutputError) {
       process.stderr.write(`jlb: ${error.message}\n`);
       process.exitCode = 2;
       return;

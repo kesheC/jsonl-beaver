@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { Aggregator, depthOf, LengthHistogram, Reservoir, StatAccumulator, toNumber, typeOf } from "../src/agg.js";
+import { Aggregator, depthOf, LengthHistogram, Reservoir, StatAccumulator, stringifyKey, toNumber, typeOf } from "../src/agg.js";
 import { getByPath } from "../src/path.js";
 
 describe("stats primitives", () => {
@@ -165,5 +165,27 @@ describe("Aggregator", () => {
     expect(aggregator.size).toBe(30);
     expect(aggregator.results(5)).toHaveLength(5);
     expect(aggregator.results(0)).toHaveLength(30);
+  });
+
+  it("stringifies keys it cannot JSON-encode instead of returning undefined", () => {
+    for (const odd of [0, 1.5, true, "s", [], {}, { a: 1 }]) {
+      const key = stringifyKey(odd);
+      expect(typeof key).toBe("string");
+    }
+    expect(stringifyKey(undefined)).toBe("(missing)");
+    expect(stringifyKey(null)).toBe("(null)");
+  });
+
+  it("groups a prototype-named --by under (missing) without throwing", () => {
+    const aggregator = buildAgg({ by: "constructor", sum: "constructor" });
+    expect(() => {
+      aggregator.add({ a: 1 }, getByPath);
+      aggregator.add({ a: 2 }, getByPath);
+    }).not.toThrow();
+    const groups = aggregator.results(10);
+    expect(groups).toHaveLength(1);
+    expect(groups[0]!.key).toBe("(missing)");
+    expect(groups[0]!.count).toBe(2);
+    expect(groups[0]!.sum).toBe(0);
   });
 });

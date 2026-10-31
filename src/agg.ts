@@ -343,9 +343,14 @@ export function stringifyKey(value: unknown): string {
   if (value === null) return "(null)";
   if (typeof value === "string") return value;
   if (typeof value === "number" || typeof value === "boolean") return String(value);
+  // JSON.stringify returns undefined (not a string) for values it cannot
+  // represent — functions, symbols — and an undefined key would blow up
+  // downstream when it is used as a hash seed. Fall back to a string.
+  let json: string | undefined;
   try {
-    return JSON.stringify(value);
+    json = JSON.stringify(value);
   } catch {
-    return String(value);
+    json = undefined;
   }
+  return json === undefined ? String(value) : json;
 }

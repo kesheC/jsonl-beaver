@@ -60,6 +60,11 @@ export {
   compactJson,
 } from "./format.js";
 export {
+  openOutputSink,
+  OutputError,
+  type OutputSink,
+} from "./output.js";
+export {
   collectStat,
   runHead,
   runFilter,

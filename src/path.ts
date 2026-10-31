@@ -56,12 +56,18 @@ export function getBySegments(value: unknown, segments: readonly PathSegment[]):
         current = current[seg < 0 ? current.length + seg : seg];
       } else if (typeof current === "object") {
         // Numeric object keys ("0", "1", …) are legal JSON; honour them.
-        current = (current as Record<string, unknown>)[String(seg)];
+        const key = String(seg);
+        if (!Object.hasOwn(current, key)) return undefined;
+        current = (current as Record<string, unknown>)[key];
       } else {
         return undefined;
       }
     } else {
       if (typeof current !== "object" || Array.isArray(current)) return undefined;
+      // Own-property check, not a bare lookup: a plain lookup also resolves
+      // inherited Object.prototype members, so a filter on "constructor",
+      // "toString" or "__proto__" would find a field on every record.
+      if (!Object.hasOwn(current, seg)) return undefined;
       current = (current as Record<string, unknown>)[seg];
     }
   }

@@ -32,4 +32,21 @@ describe("field paths", () => {
     expect(getByPath({ a: 5 }, "a.b")).toBeUndefined();
     expect(getByPath(null, "a")).toBeUndefined();
   });
+
+  it("does not resolve Object.prototype members as fields", () => {
+    const record = { a: 1 };
+    for (const key of ["constructor", "toString", "valueOf", "hasOwnProperty", "__proto__", "isPrototypeOf", "toLocaleString"]) {
+      expect(getByPath(record, key)).toBeUndefined();
+    }
+  });
+
+  it("still resolves shadowed prototype-named fields", () => {
+    expect(getByPath({ constructor: "x" }, "constructor")).toBe("x");
+    expect(getByPath({ toString: 1 }, "toString")).toBe(1);
+  });
+
+  it("does not resolve prototype members through numeric segments", () => {
+    expect(getByPath({ a: 1 }, "a.0")).toBeUndefined();
+    expect(getByPath([], "constructor")).toBeUndefined();
+  });
 });

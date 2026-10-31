@@ -136,6 +136,14 @@ describe("renderStat", () => {
     expect(text).toContain("Fields: none");
   });
 
+  it("distinguishes a zero field budget from a file with no objects", () => {
+    // --top 0 used to print "no top-level object records" for a perfectly
+    // ordinary file. The CLI now rejects it, so this guards the renderer.
+    const text = renderStat(statFixture, 0);
+    expect(text).toContain("none requested");
+    expect(text).not.toContain("no top-level object records");
+  });
+
   it("truncates the field list to the requested count", () => {
     const text = renderStat(statFixture, 1);
     expect(text).toContain("Top fields (1 of 2)");
