@@ -266,7 +266,15 @@ ts,level,status,path
 ```
 
 CSV output is RFC 4180: commas, quotes and newlines are escaped and embedded
-quotes are doubled.
+quotes are doubled. The CLI writes LF line endings (`od -c` of the output above shows
+`a \n 1 \n 2 \n`) so it behaves the same on Windows and on Linux. The library
+function `toCsv(fields, rows)` defaults to CRLF per RFC 4180; pass `"\n"` as the third
+argument if you want what the CLI emits.
+
+`-o FILE` is written atomically: `jlb` creates a temp file next to the target and
+renames it into place only after the command succeeded. A wrong flag, a missing input
+or a `--where` that does not compile therefore leaves an existing file untouched —
+and `jlb head -o data.jsonl data.jsonl` is refused instead of truncating its own input.
 
 ### Global options
 
@@ -275,8 +283,8 @@ quotes are doubled.
 | `--skip-invalid` | Skip malformed lines instead of failing on the first one |
 | `--json` | Machine-readable JSON on stdout instead of a table |
 | `--progress` | Progress tick on stderr every 1,000,000 lines |
-| `--limit N` | Stop after N matching records |
-| `--top N` | Rows in `stat` (fields) / `agg` (groups) output |
+| `--limit N` | Stop after N records (`filter`, `to-csv`, `to-jsonl` only) |
+| `--top N` | Rows in `stat` (fields) / `agg` (groups) output, must be >= 1 |
 | `--out FILE` | Write output to a file instead of stdout |
 | `--quiet` | Suppress the summary footer |
 
@@ -336,7 +344,7 @@ npm run bench -- --out bench-1gb.jsonl --gb 1
 
 | File | Lines | Bytes | `stat` | Throughput | Peak RSS |
 | --- | --- | --- | --- | --- | --- |
-| `bench-100mb.jsonl` | 446,063 | 100.0 MiB | 1.23 s | 81.4 MiB/s | 82.5 MiB |
+| `bench-100mb.jsonl` | 446,062 | 100.0 MiB | 1.23 s | 81.4 MiB/s | 82.5 MiB |
 | `bench-1gb.jsonl` | 4,567,729 | 1.0 GiB | 11.58 s | 88.4 MiB/s | 127.3 MiB |
 
 `stat` on the 1 GB file:
@@ -424,7 +432,17 @@ low-cardinality key when memory matters.
 
 **Are percentiles exact?** Line-length percentiles are exact below 4,096 chars and
 bucket-approximated above. Numeric p95 is exact for groups with up to 4,096
-numeric observations and a deterministic reservoir estimate beyond that.
+numeric observations; beyond that it is a deterministic reservoir estimate, so the
+same input always gives the same answer but the answer can be slightly off. Measured
+on 200,000 records of `{"v":1..200000}` the true nearest-rank p95 is 190,000 and
+`jlb agg --p95 v` reports 191,240 — about 0.6% high. Re-running prints the identical
+number.
+
+**What does `--sum` do with non-numeric values?** `toNumber` coerces the way JavaScript
+does: `true` becomes 1, numeric strings are parsed, and everything else (`null`, `"abc"`,
+objects) is ignored rather than counted as 0. On
+`{"v":"10"},{"v":20},{"v":"abc"},{"v":null},{"v":true}` you get `COUNT 5 / SUM 31` and
+`AVG 10.33` — the count is of records, the average is over the 3 numeric observations.
 
 **Does it validate against a schema?** No — it reports what it sees. There is no
 JSON Schema support, no date parsing, no timezone handling. Timestamps are
@@ -677,7 +695,14 @@ ts,level,status,path
 2026-10-01T00:00:00.800Z,info,200,/api/cart
 ```
 
-CSV 输出遵循 RFC 4180：逗号、引号、换行都会被转义，内嵌引号会被双写。
+CSV 输出遵循 RFC 4180：逗号、引号、换行都会被转义，内嵌引号会被双写。命令行输出用 LF
+换行（上面那份输出的 `od -c` 是 `a \n 1 \n 2 \n`），所以在 Windows 和 Linux 上行为
+一致。库函数 `toCsv(fields, rows)` 按 RFC 4180 默认 CRLF，想要和命令行一样就在第三个参数
+传 `"\n"`。
+
+`-o FILE` 是原子写入：`jlb` 先在目标旁边建临时文件，命令成功后才 rename 覆盖目标。
+因此参数写错、输入文件不存在、`--where` 编译失败都不会破坏已有的输出文件；
+`jlb head -o data.jsonl data.jsonl` 会被直接拒绝，而不是把自己的输入截断成空文件。
 
 ### 全局参数
 
@@ -686,8 +711,8 @@ CSV 输出遵循 RFC 4180：逗号、引号、换行都会被转义，内嵌引�
 | `--skip-invalid` | 跳过坏行而不是在第一行就失败 |
 | `--json` | stdout 输出机器可读的 JSON 而非表格 |
 | `--progress` | 每 1,000,000 行在 stderr 打一次进度 |
-| `--limit N` | 匹配到 N 条后停止 |
-| `--top N` | `stat`（字段）/ `agg`（分组）输出的行数 |
+| `--limit N` | 匹配到 N 条后停止（仅 `filter` / `to-csv` / `to-jsonl`） |
+| `--top N` | `stat`（字段）/ `agg`（分组）输出的行数，必须 >= 1 |
 | `--out FILE` | 输出写入文件而不是 stdout |
 | `--quiet` | 关闭汇总提示 |
 
@@ -741,7 +766,7 @@ npm run bench -- --out bench-1gb.jsonl --gb 1
 
 | 文件 | 行数 | 大小 | `stat` 耗时 | 吞吐 | 峰值 RSS |
 | --- | --- | --- | --- | --- | --- |
-| `bench-100mb.jsonl` | 446,063 | 100.0 MiB | 1.23 s | 81.4 MiB/s | 82.5 MiB |
+| `bench-100mb.jsonl` | 446,062 | 100.0 MiB | 1.23 s | 81.4 MiB/s | 82.5 MiB |
 | `bench-1gb.jsonl` | 4,567,729 | 1.0 GiB | 11.58 s | 88.4 MiB/s | 127.3 MiB |
 
 对 1 GB 文件跑 `stat`：
@@ -823,7 +848,14 @@ const { groups } = await runAgg("demo/access.jsonl", { by: "path", sum: "bytes",
 内存敏感时请配合 `--top` 和低基数键使用。
 
 **分位数是精确的吗？** 行长分位数在 4,096 字符以内精确，之上是分桶近似。
-数值 p95 在每组 4,096 个观测以内精确，超出后是确定性蓄水池估计。
+数值 p95 在每组 4,096 个观测以内精确；超出后是确定性蓄水池估计，同样的输入永远给出
+同样的结果，但结果本身可能略有偏差。实测 200,000 条 `{"v":1..200000}`：真实的最近秩
+p95 是 190,000，`jlb agg --p95 v` 给出 191,240，偏高约 0.6%，重复运行结果完全相同。
+
+**`--sum` 遇到非数值怎么办？** `toNumber` 按 JavaScript 的方式转换：`true` 变成 1，
+数字字符串会被解析，其余（`null`、`"abc"`、对象）直接忽略而不是当 0 计。对
+`{"v":"10"},{"v":20},{"v":"abc"},{"v":null},{"v":true}` 运行结果是 `COUNT 5 / SUM 31`、
+`AVG 10.33` —— COUNT 数的是记录数，AVG 除的是那 3 个数值观测。
 
 **会做 schema 校验吗？** 不会 —— 它只报告看到的东西。不支持 JSON Schema、不做
 日期解析、不处理时区。时间戳一律当作不透明字符串。
