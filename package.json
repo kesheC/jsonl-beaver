@@ -26,7 +26,8 @@
     "build": "tsc -p tsconfig.build.json",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
-    "dev": "node --experimental-strip-types src/cli.ts"
+    "dev": "node --experimental-strip-types src/cli.ts",
+    "prepare": "npm run build"
   },
   "keywords": [
     "jsonl",
@@ -47,5 +48,10 @@
     "@types/node": "^22.10.2",
     "typescript": "^5.7.2",
     "vitest": "^2.1.8"
-  }
+  },
+  "author": "kesheC",
+  "bugs": {
+    "url": "https://github.com/kesheC/jsonl-beaver/issues"
+  },
+  "homepage": "https://github.com/kesheC/jsonl-beaver#readme"
 }
