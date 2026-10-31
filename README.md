@@ -32,6 +32,18 @@ npm install -g https://github.com/kesheC/jsonl-beaver/releases/latest/download/j
 jlb --version
 ```
 
+Every release publishes the same tarball under a stable name (`jsonl-beaver.tgz`) alongside a
+`jsonl-beaver.tgz.sha256` checksum. To verify the download before running it:
+
+```bash
+curl -sLO https://github.com/kesheC/jsonl-beaver/releases/latest/download/jsonl-beaver.tgz
+curl -sLO https://github.com/kesheC/jsonl-beaver/releases/latest/download/jsonl-beaver.tgz.sha256
+sha256sum -c jsonl-beaver.tgz.sha256          # jsonl-beaver.tgz: OK
+npm install -g ./jsonl-beaver.tgz
+```
+
+On macOS use `shasum -a 256 -c jsonl-beaver.tgz.sha256` — there is no `sha256sum` by default.
+
 Or build it from a checkout:
 
 ```bash
@@ -463,6 +475,18 @@ MIT — see [LICENSE](LICENSE). Copyright (c) 2026 kesheC.
 npm install -g https://github.com/kesheC/jsonl-beaver/releases/latest/download/jsonl-beaver.tgz
 jlb --version
 ```
+
+每个 release 都用固定名字（`jsonl-beaver.tgz`）发布同一个 tarball，并附一份
+`jsonl-beaver.tgz.sha256` 校验和。运行之前先验一下：
+
+```bash
+curl -sLO https://github.com/kesheC/jsonl-beaver/releases/latest/download/jsonl-beaver.tgz
+curl -sLO https://github.com/kesheC/jsonl-beaver/releases/latest/download/jsonl-beaver.tgz.sha256
+sha256sum -c jsonl-beaver.tgz.sha256          # jsonl-beaver.tgz: OK
+npm install -g ./jsonl-beaver.tgz
+```
+
+macOS 上没有 `sha256sum`，用 `shasum -a 256 -c jsonl-beaver.tgz.sha256`。
 
 或者从源码自己编译：
 
