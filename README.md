@@ -274,7 +274,7 @@ argument if you want what the CLI emits.
 `-o FILE` is written atomically: `jlb` creates a temp file next to the target and
 renames it into place only after the command succeeded. A wrong flag, a missing input
 or a `--where` that does not compile therefore leaves an existing file untouched —
-and `jlb head -o data.jsonl data.jsonl` is refused instead of truncating its own input.
+and `jlb head -o demo/access.jsonl demo/access.jsonl` is refused instead of truncating its own input.
 Surrounding whitespace on the `-o` value is trimmed first, so `-o "out.csv "` writes
 `out.csv` and still hits the self-overwrite guard.
 
@@ -286,7 +286,10 @@ belonging to a concurrently running `jlb` is left strictly alone:
 
 ```text
 $ touch .out.csv.zzzzz.abc123.jlb-tmp   # pid 60466175 in base36: not running
-$ jlb head d.jsonl -n 1 -o out.csv
+$ ls -a | grep -c jlb-tmp
+1
+$ jlb head demo/access.jsonl -n 1 -o out.csv
+jlb: stopped after 1 record(s)
 $ ls -a | grep -c jlb-tmp
 0
 ```
@@ -296,7 +299,8 @@ closes the writing side of the pipe; `jlb` treats that as "the reader has what i
 wanted", finishes the file it was asked to write, and exits 0:
 
 ```text
-$ jlb to-csv half.jsonl --fields n --skip-invalid -o out.csv 2>&1 | head -1
+$ head -n 52 demo/access.jsonl | sed '2s/.*/not json/; 10s/.*/not json either/' > half.jsonl
+$ jlb to-csv half.jsonl --fields status --skip-invalid -o out.csv 2>&1 | head -1
 jlb: skipping line 2: Unexpected token 'o', "not json" is not valid JSON
 $ echo ${PIPESTATUS[0]}   # the writer, not head
 0
@@ -335,6 +339,11 @@ grep '"level":"error"' demo/access.jsonl | jlb agg - --by path --count
 ### When a line is not JSON
 
 By default the first malformed line stops the run with an exit code of 1:
+
+```bash
+printf '{"a":1}\n{oops\n' > bad.jsonl
+jlb stat bad.jsonl
+```
 
 ```text
 jlb: line 2: Expected property name or '}'
@@ -379,8 +388,13 @@ npm run bench -- --out bench-1gb.jsonl --gb 1
 
 | File | Lines | Bytes | `stat` | Throughput | Peak RSS |
 | --- | --- | --- | --- | --- | --- |
-| `bench-100mb.jsonl` | 446,062 | 100.0 MiB | 1.23 s | 81.4 MiB/s | 82.5 MiB |
+| `bench-100mb.jsonl` | 446,063 | 100.0 MiB | 1.23 s | 81.4 MiB/s | 82.5 MiB |
 | `bench-1gb.jsonl` | 4,567,729 | 1.0 GiB | 11.58 s | 88.4 MiB/s | 127.3 MiB |
+
+The line counts and byte sizes are exact and identical on every machine — the
+generator is seeded. The wall-clock times are not: they were taken on an idle
+box, and a loaded machine will be slower. Compare your own runs to each other,
+not to this row.
 
 `stat` on the 1 GB file:
 
@@ -416,7 +430,7 @@ Ten times more data costs about 45 MiB more memory. That is the whole design goa
 ## API
 
 The streaming engine is exported as a library, so you can embed it instead of
-shelling out. `index.ts` never touches `process.argv` or calls `process.exit`.
+shelling out. `src/index.ts` never touches `process.argv` or calls `process.exit`.
 
 ```ts
 import { collectStat, runFilter, runAgg, streamJsonl, compileExpr } from "jsonl-beaver";
@@ -737,7 +751,7 @@ CSV 输出遵循 RFC 4180：逗号、引号、换行都会被转义，内嵌引�
 
 `-o FILE` 是原子写入：`jlb` 先在目标旁边建临时文件，命令成功后才 rename 覆盖目标。
 因此参数写错、输入文件不存在、`--where` 编译失败都不会破坏已有的输出文件；
-`jlb head -o data.jsonl data.jsonl` 会被直接拒绝，而不是把自己的输入截断成空文件。
+`jlb head -o demo/access.jsonl demo/access.jsonl` 会被直接拒绝，而不是把自己的输入截断成空文件。
 `-o` 两侧的空白会先被裁掉，所以 `-o "out.csv "` 写的是 `out.csv`，也照样会走
 自覆盖保护。
 
@@ -748,7 +762,10 @@ CSV 输出遵循 RFC 4180：逗号、引号、换行都会被转义，内嵌引�
 
 ```text
 $ touch .out.csv.zzzzz.abc123.jlb-tmp   # 60466175 的 36 进制，该进程并不存在
-$ jlb head d.jsonl -n 1 -o out.csv
+$ ls -a | grep -c jlb-tmp
+1
+$ jlb head demo/access.jsonl -n 1 -o out.csv
+jlb: stopped after 1 record(s)
 $ ls -a | grep -c jlb-tmp
 0
 ```
@@ -757,7 +774,8 @@ $ ls -a | grep -c jlb-tmp
 情况理解为"读取方已经拿到它要的东西"，于是把自己被要求写的文件写完，然后以 0 退出：
 
 ```text
-$ jlb to-csv half.jsonl --fields n --skip-invalid -o out.csv 2>&1 | head -1
+$ head -n 52 demo/access.jsonl | sed '2s/.*/not json/; 10s/.*/not json either/' > half.jsonl
+$ jlb to-csv half.jsonl --fields status --skip-invalid -o out.csv 2>&1 | head -1
 jlb: skipping line 2: Unexpected token 'o', "not json" is not valid JSON
 $ echo ${PIPESTATUS[0]}   # 这是写端的状态，不是 head 的
 0
@@ -796,6 +814,11 @@ grep '"level":"error"' demo/access.jsonl | jlb agg - --by path --count
 
 默认情况下遇到第一行坏数据就停止，退出码 1：
 
+```bash
+printf '{"a":1}\n{oops\n' > bad.jsonl
+jlb stat bad.jsonl
+```
+
 ```text
 jlb: line 2: Expected property name or '}'
      {oops
@@ -833,8 +856,12 @@ npm run bench -- --out bench-1gb.jsonl --gb 1
 
 | 文件 | 行数 | 大小 | `stat` 耗时 | 吞吐 | 峰值 RSS |
 | --- | --- | --- | --- | --- | --- |
-| `bench-100mb.jsonl` | 446,062 | 100.0 MiB | 1.23 s | 81.4 MiB/s | 82.5 MiB |
+| `bench-100mb.jsonl` | 446,063 | 100.0 MiB | 1.23 s | 81.4 MiB/s | 82.5 MiB |
 | `bench-1gb.jsonl` | 4,567,729 | 1.0 GiB | 11.58 s | 88.4 MiB/s | 127.3 MiB |
+
+行数和字节数在任何机器上都完全一致（生成器是定种子的）；但墙上时间不是 ——
+那是在空载机器上测的，机器一忙就会变慢。请用你自己几次运行的相对值比较，
+而不是拿绝对秒数对照这张表。
 
 对 1 GB 文件跑 `stat`：
 
@@ -867,7 +894,7 @@ real    0m9.054s
 
 ## 库 API
 
-流式引擎以库的形式导出，可以直接嵌入而不必起子进程。`index.ts` 从不读取
+流式引擎以库的形式导出，可以直接嵌入而不必起子进程。`src/index.ts` 从不读取
 `process.argv`，也从不调用 `process.exit`。
 
 ```ts
