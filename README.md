@@ -273,7 +273,7 @@ quotes are doubled.
 
 ```bash
 cat demo/access.jsonl | jlb stat -
-grep '"level":"error"' app.log | jlb agg - --by path --count
+grep '"level":"error"' demo/access.jsonl | jlb agg - --by path --count
 ```
 
 ### When a line is not JSON
@@ -666,7 +666,7 @@ CSV 输出遵循 RFC 4180：逗号、引号、换行都会被转义，内嵌引�
 
 ```bash
 cat demo/access.jsonl | jlb stat -
-grep '"level":"error"' app.log | jlb agg - --by path --count
+grep '"level":"error"' demo/access.jsonl | jlb agg - --by path --count
 ```
 
 ### 当某一行不是 JSON
