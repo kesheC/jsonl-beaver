@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.11] - 2026-11-01
+
 ### Fixed
 
 - **`--help` no longer hides a command that does not exist.** `jlb bogus --help`
@@ -20,13 +22,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   supported by stat; it applies to "jlb --version" on its own`.
 - **A dash-shaped first word reads as a misspelled option.** `jlb --versoin`
   answered `unknown command: --versoin`, which sends the reader looking for a
-  subcommand instead of at the spelling of the flag.- **A failure is a document too, not just a sentence.** `jlb stat --json
+  subcommand instead of at the spelling of the flag.
+- **A failure is a document too, not just a sentence.** `jlb stat --json
   /missing.jsonl` exited 2 and wrote nothing to stdout, so a wrapper could not
   tell a failed run from an empty file. Every failure path (`--json`) now emits
   `{"error":{"message":...,"exitCode":n}}` on stdout as well, with the exit
   code the run really used; the `jlb:` line on stderr is unchanged and stdout
   stays empty when `--json` was not asked for. A `--json` after `--` still
   belongs to whatever the caller named.
+
+### Quality
+
+- 171 tests across 9 spec files, 2633 lines of TypeScript.
+- CI matrix: Ubuntu and Windows, Node 20 and 22.
+- Zero runtime dependencies.
 
 ## [0.1.10] - 2026-11-01
 
@@ -252,7 +261,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - CI matrix: Ubuntu and Windows, Node 20 and 22.
 - Zero runtime dependencies.
 
-[Unreleased]: https://github.com/kesheC/jsonl-beaver/compare/v0.1.10...HEAD
+[0.1.11]: https://github.com/kesheC/jsonl-beaver/compare/v0.1.10...v0.1.11
+[Unreleased]: https://github.com/kesheC/jsonl-beaver/compare/v0.1.11...HEAD
 [0.1.10]: https://github.com/kesheC/jsonl-beaver/compare/v0.1.9...v0.1.10
 [0.1.9]: https://github.com/kesheC/jsonl-beaver/compare/v0.1.8...v0.1.9
 [0.1.8]: https://github.com/kesheC/jsonl-beaver/compare/v0.1.7...v0.1.8
