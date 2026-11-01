@@ -362,6 +362,38 @@ function validateForCommand(
   return { lines, fields };
 }
 
+/**
+ * Whether the line asks for machine output, judged from the raw tokens.
+ *
+ * The failure paths need this before the command has been parsed: an unknown
+ * command, a bad option and a missing file all happen before any report is
+ * produced, and a caller that passed --json still asked for a document.
+ */
+function wantsJson(argv: readonly string[]): boolean {
+  for (const token of argv) {
+    if (token === "--") break;
+    if (token === "--json") return true;
+    if (token.startsWith("--json=")) return token.slice("--json=".length) !== "false";
+  }
+  return false;
+}
+
+/**
+ * Report one failure twice: the sentence a person reads on stderr and the
+ * document a wrapper parses on stdout.
+ *
+ * `jlb stat --json /missing.jsonl` exited 2 and wrote nothing to stdout, so a
+ * script could not tell a failed run from an empty file. The shape matches
+ * apidiff, envpulse and repropack: {"error":{"message":...,"exitCode":n}}.
+ */
+function reportFailure(message: string, exitCode: number, wantJson: boolean): void {
+  if (wantJson) {
+    process.stdout.write(JSON.stringify({ error: { message, exitCode } }, null, 2) + "\n");
+  }
+  process.stderr.write(`jlb: ${message}\n`);
+  process.exitCode = exitCode;
+}
+
 async function main(argv: readonly string[]): Promise<number> {
   if (argv.length === 0) {
     process.stdout.write(HELP);
@@ -591,22 +623,21 @@ main(process.argv.slice(2))
     process.exitCode = code;
   })
   .catch((error: unknown) => {
-    if (error instanceof ArgError) {
-      process.stderr.write(`jlb: ${error.message}\n`);
-      process.exitCode = 2;
+    // A caller that asked for --json gets a document even here: every exit path
+    // writes the same shape to stdout, so a wrapper can parse one thing.
+    const wantJson = wantsJson(process.argv.slice(2));
+    if (error instanceof ArgError || error instanceof InputError || error instanceof OutputError) {
+      reportFailure(error.message, 2, wantJson);
       return;
     }
     if (error instanceof ExprError) {
-      process.stderr.write(`jlb: bad --where expression at column ${error.position + 1}: ${error.message}\n`);
-      process.exitCode = 2;
-      return;
-    }
-    if (error instanceof InputError || error instanceof OutputError) {
-      process.stderr.write(`jlb: ${error.message}\n`);
-      process.exitCode = 2;
+      reportFailure(`bad --where expression at column ${error.position + 1}: ${error.message}`, 2, wantJson);
       return;
     }
     if (error instanceof InvalidLineError) {
+      if (wantJson) {
+        process.stdout.write(JSON.stringify({ error: { message: error.message, exitCode: 1, line: error.bad.line } }, null, 2) + "\n");
+      }
       process.stderr.write(`jlb: ${error.message}\n`);
       process.stderr.write(`     ${error.bad.excerpt}\n`);
       process.stderr.write("     (pass --skip-invalid to skip malformed lines)\n");
@@ -614,6 +645,5 @@ main(process.argv.slice(2))
       return;
     }
     const message = error instanceof Error ? error.message : String(error);
-    process.stderr.write(`jlb: ${message}\n`);
-    process.exitCode = 1;
+    reportFailure(message, 1, wantJson);
   });

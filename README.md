@@ -354,6 +354,24 @@ invisible. `--version` is a standalone command (`jlb --version`) and is
 rejected after a command name; `--help` is the exception and still wins over
 anything else on the line.
 
+A failure is a document too. When `--json` is on the line, every exit path
+writes the same shape to stdout, so a wrapper parses one thing and never has to
+guess from an empty stream:
+
+```text
+$ jlb stat --json ./missing.jsonl; echo "exit=$?"
+{
+  "error": {
+    "message": "no such file: ./missing.jsonl",
+    "exitCode": 2
+  }
+}
+exit=2
+```
+
+Without `--json` stdout stays empty; the `jlb: ...` sentence on stderr is the
+same either way.
+
 `--fields` is split on commas and trimmed. Empty segments are dropped, so
 `--fields a,,b` and `--fields a,b,` both select the same two fields — a stray comma
 is a typo, not a request for an unnamed column. A value with nothing left in it
@@ -890,6 +908,8 @@ jlb: --top is not supported by head; it applies to stat and agg
 情况的输出一模一样，所以这个错误根本看不出来。`--version` 是一个独立命令
 （`jlb --version`），写在命令名后面会被拒绝；`--help` 是例外，仍然优先于
 同一行上的其它任何参数。
+
+失败也是一个文档：只要行上有 `--json`，每条退出路径都会把同一个形状写进 stdout——`{"error":{"message":"no such file: ./missing.jsonl","exitCode":2}}`——脚本不必再从空流里猜成败；不带 `--json` 时 stdout 一个字节都不写，stderr 的 `jlb: ...` 那句话两种情况下完全一样。
 
 `--fields` 按逗号切分并逐段 trim。空段会被丢弃，所以 `--fields a,,b` 和
 `--fields a,b,` 选的是同样两个字段——多打一个逗号是手误，不是在要一个无名列。

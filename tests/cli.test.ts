@@ -436,3 +436,41 @@ describe("a flag the command never reads is rejected, not ignored", () => {
     expect(silent.stdout).toBe(withNote.stdout);
   });
 });
+
+describe("--json failure documents", () => {
+  // A failure used to be a line on stderr written where it was detected, so
+  // `jlb stat --json /missing.jsonl` exited 2 with an empty stdout and a
+  // wrapper could not tell a failed run from an empty file.
+  it("answers a --json caller with a document even when the run fails", async () => {
+    const missing = path.join(dir, "no-such-file.jsonl");
+    const cases: [string[], string][] = [
+      [["stat", "--json", missing], "no such file"],
+      [["stat", "--json", "--bogus", records], "unknown option: --bogus"],
+      [["--json", "--bogus"], "unknown option: --bogus"],
+      [["stat", "--json", "--version", records], "--version is not supported"],
+      [["stat", "--json", "--by", "n", records], "--by is not supported by stat"],
+      [["filter", "--json", "--where", "n ==", records], "bad --where expression"],
+    ];
+    for (const [args, expected] of cases) {
+      const result = await runCli(args, { cwd: dir });
+      expect(result.code, args.join(" ")).toBe(2);
+      const parsed = JSON.parse(result.stdout) as { error: { message: string; exitCode: number } };
+      expect(parsed.error.message, args.join(" ")).toContain(expected);
+      expect(parsed.error.exitCode, args.join(" ")).toBe(2);
+      expect(result.stderr, args.join(" ")).toContain("jlb: ");
+    }
+  });
+
+  it("keeps stdout empty on failure when --json was not asked for", async () => {
+    const result = await runCli(["stat", path.join(dir, "no-such-file.jsonl")], { cwd: dir });
+    expect(result.code).toBe(2);
+    expect(result.stdout).toBe("");
+    expect(result.stderr).toContain("jlb: no such file");
+  });
+
+  it("does not mistake a --json after the separator for the caller's own flag", async () => {
+    const result = await runCli(["stat", "--bogus", "--", "--json"], { cwd: dir });
+    expect(result.code).toBe(2);
+    expect(result.stdout).toBe("");
+  });
+});

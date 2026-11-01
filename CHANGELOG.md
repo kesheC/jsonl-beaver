@@ -20,7 +20,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   supported by stat; it applies to "jlb --version" on its own`.
 - **A dash-shaped first word reads as a misspelled option.** `jlb --versoin`
   answered `unknown command: --versoin`, which sends the reader looking for a
-  subcommand instead of at the spelling of the flag.
+  subcommand instead of at the spelling of the flag.- **A failure is a document too, not just a sentence.** `jlb stat --json
+  /missing.jsonl` exited 2 and wrote nothing to stdout, so a wrapper could not
+  tell a failed run from an empty file. Every failure path (`--json`) now emits
+  `{"error":{"message":...,"exitCode":n}}` on stdout as well, with the exit
+  code the run really used; the `jlb:` line on stderr is unchanged and stdout
+  stays empty when `--json` was not asked for. A `--json` after `--` still
+  belongs to whatever the caller named.
 
 ## [0.1.10] - 2026-11-01
 
