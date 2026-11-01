@@ -38,9 +38,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   prerelease tags; the package-contents assertion against a complete manifest,
   a stray `.js.map`, a tarball with no `dist/` at all, and a leaked `src/`.
   21 cases, up from 13.
-- **Rewriting the tests lost three guards; all three are back.** The release is
-  re-published with `gh release edit --draft=false` before any upload, the `jlb`
-  bin is smoke tested, and the build clears `dist/` before compiling.
+- **Three guards the old test did not have.** The release is re-published with
+  `gh release edit --draft=false` before any upload, the `jlb` bin is smoke
+  tested from the installed package, and the build clears `dist/` before
+  compiling -- none of the three was asserted at v0.1.7.
 
 ## [0.1.7] - 2026-11-01
 
