@@ -310,15 +310,35 @@ $ wc -l < out.csv
 
 ### Global options
 
-| Option | Meaning |
-| --- | --- |
-| `--skip-invalid` | Skip malformed lines instead of failing on the first one |
-| `--json` | Machine-readable JSON on stdout instead of a table |
-| `--progress` | Progress tick on stderr every 1,000,000 lines |
-| `--limit N` | Stop after N records (`filter`, `to-csv`, `to-jsonl` only) |
-| `--top N` | Rows in `stat` (fields) / `agg` (groups) output, must be >= 1 |
-| `--out FILE` | Write output to a file instead of stdout |
-| `--quiet` | Suppress the summary footer |
+| Option | Meaning | Commands that read it |
+| --- | --- | --- |
+| `--skip-invalid` | Skip malformed lines instead of failing on the first one | every command |
+| `--progress` | Progress tick on stderr every 1,000,000 lines | every command |
+| `--out FILE` | Write output to a file instead of stdout | every command |
+| `--quiet` | Suppress the summary footer | every command |
+| `--json` | Machine-readable JSON on stdout instead of a table | `stat`, `head`, `filter`, `agg` |
+| `--top N` | Rows in the report, must be >= 1 | `stat`, `agg` |
+| `--lines N` | Records to print, default 10 | `head` |
+| `--limit N` | Stop after N records | `filter`, `to-csv`, `to-jsonl` |
+| `--pretty` | Indent the JSON output | `head`, `filter`, `to-jsonl` |
+| `--fields a,b.c` | Columns to emit | `to-csv`, `to-jsonl` |
+| `--where / --where-file` | Filter expression | `filter`, `agg`, `to-csv`, `to-jsonl` |
+| `--by / --count / --sum / --avg / --p95` | The grouping and the metric | `agg` |
+
+Using an option outside its column is exit 2, not a silently ignored flag:
+
+```text
+$ jlb stat demo/access.jsonl --where "status>=500"
+jlb: --where is not supported by stat; it applies to filter, agg, to-csv and to-jsonl
+$ jlb head demo/access.jsonl --top 2
+jlb: --top is not supported by head; it applies to stat and agg
+```
+
+`stat --where` used to print the whole file, which reads as a filter that
+matched everything — the output was identical either way, so the mistake was
+invisible. `--version` is a standalone command (`jlb --version`) and is
+rejected after a command name; `--help` is the exception and still wins over
+anything else on the line.
 
 `--fields` is split on commas and trimmed. Empty segments are dropped, so
 `--fields a,,b` and `--fields a,b,` both select the same two fields — a stray comma
@@ -815,15 +835,34 @@ $ wc -l < out.csv
 
 ### 全局参数
 
-| 参数 | 含义 |
-| --- | --- |
-| `--skip-invalid` | 跳过坏行而不是在第一行就失败 |
-| `--json` | stdout 输出机器可读的 JSON 而非表格 |
-| `--progress` | 每 1,000,000 行在 stderr 打一次进度 |
-| `--limit N` | 匹配到 N 条后停止（仅 `filter` / `to-csv` / `to-jsonl`） |
-| `--top N` | `stat`（字段）/ `agg`（分组）输出的行数，必须 >= 1 |
-| `--out FILE` | 输出写入文件而不是 stdout |
-| `--quiet` | 关闭汇总提示 |
+| 参数 | 含义 | 哪些命令会读它 |
+| --- | --- | --- |
+| `--skip-invalid` | 跳过坏行而不是在第一行就失败 | 所有命令 |
+| `--progress` | 每 1,000,000 行在 stderr 打一次进度 | 所有命令 |
+| `--out FILE` | 输出写入文件而不是 stdout | 所有命令 |
+| `--quiet` | 关闭汇总提示 | 所有命令 |
+| `--json` | stdout 输出机器可读的 JSON 而非表格 | `stat` / `head` / `filter` / `agg` |
+| `--top N` | 输出的行数，必须 >= 1 | `stat` / `agg` |
+| `--lines N` | 打印多少条，默认 10 | `head` |
+| `--limit N` | 匹配到 N 条后停止 | `filter` / `to-csv` / `to-jsonl` |
+| `--pretty` | 缩进输出 JSON | `head` / `filter` / `to-jsonl` |
+| `--fields a,b.c` | 要输出的列 | `to-csv` / `to-jsonl` |
+| `--where / --where-file` | 过滤表达式 | `filter` / `agg` / `to-csv` / `to-jsonl` |
+| `--by / --count / --sum / --avg / --p95` | 分组方式和指标 | `agg` |
+
+在不属于它的命令上用这些参数是 exit 2，而不是静默忽略：
+
+```text
+$ jlb stat demo/access.jsonl --where "status>=500"
+jlb: --where is not supported by stat; it applies to filter, agg, to-csv and to-jsonl
+$ jlb head demo/access.jsonl --top 2
+jlb: --top is not supported by head; it applies to stat and agg
+```
+
+`stat --where` 以前会把整个文件原样打出来，读起来就像"过滤匹配了全部"——两种
+情况的输出一模一样，所以这个错误根本看不出来。`--version` 是一个独立命令
+（`jlb --version`），写在命令名后面会被拒绝；`--help` 是例外，仍然优先于
+同一行上的其它任何参数。
 
 `--fields` 按逗号切分并逐段 trim。空段会被丢弃，所以 `--fields a,,b` 和
 `--fields a,b,` 选的是同样两个字段——多打一个逗号是手误，不是在要一个无名列。

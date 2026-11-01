@@ -43,25 +43,34 @@ const HELP = `jlb — streaming JSONL log analytics
 
 Usage:
   jlb stat    <file|-> [--top N] [--json] [--skip-invalid]
-  jlb head    <file|-> [-n N] [--pretty] [--skip-invalid]
+  jlb head    <file|-> [-n N] [--pretty] [--json] [--skip-invalid]
   jlb filter  <file|-> --where "expr" [--limit N] [--pretty] [--json]
   jlb agg     <file|-> [--by field] [--count|--sum f|--avg f|--p95 f]
-              [--top N] [--where "expr"] [--json]
+              [--where "expr"] [--top N] [--json]
   jlb to-csv  <file|-> --fields a,b.c [--where "expr"] [--limit N] [-o file]
   jlb to-jsonl <file|-> --fields a,b.c [--where "expr"] [--limit N] [--pretty]
 
   jlb --help | jlb --version
 
-Common options:
-  -w, --where <expr>    Filter expression (also valid for agg/to-csv/to-jsonl)
-      --where-file <f>  Read the expression from a file
-      --skip-invalid    Skip malformed lines instead of failing on the first one
-      --json            Machine-readable JSON on stdout instead of a table
-      --progress        Print a progress tick to stderr every 1M lines
-  -l, --limit <n>       Stop after n records (filter, to-csv, to-jsonl only)
-  -t, --top <n>         Rows in stat (fields) / agg (groups) output, >= 1
-  -o, --out <file>      Write output to a file instead of stdout
-      --quiet           Suppress the summary footer
+Options, and the commands that read them:
+  -w, --where <expr>    Filter expression   (filter, agg, to-csv, to-jsonl)
+      --where-file <f>  Read the expression from a file   (same four)
+      --skip-invalid    Skip malformed lines   (every command)
+      --progress        stderr tick every 1M lines   (every command)
+  -o, --out <file>      Write to a file   (every command)
+      --quiet           Suppress the footer   (every command)
+      --json            JSON on stdout   (stat, head, filter, agg)
+  -t, --top <n>         Rows in the report, >= 1   (stat, agg)
+  -n, --lines <n>       Records to print, default 10   (head)
+  -l, --limit <n>       Stop after n records   (filter, to-csv, to-jsonl)
+      --pretty          Indented JSON   (head, filter, to-jsonl)
+  -f, --fields <list>   Columns to emit   (to-csv, to-jsonl)
+      --by <field>      Group by   (agg)
+      --count           Count per group   (agg)
+      --sum/--avg/--p95 <field>   One metric per group   (agg)
+
+  An option outside its list is rejected with exit 2, not ignored: a filter
+  that silently did nothing would look like a filter that matched everything.
 
 Where expressions:
   status>=500 and level=error
@@ -168,7 +177,94 @@ function parseFieldList(raw: string | undefined): string[] {
   return fields;
 }
 
-const LIMIT_COMMANDS = new Set(["filter", "to-csv", "to-jsonl"]);
+/**
+ * The options each command actually reads.
+ *
+ * This table is the contract, not a summary of the help text: every entry is
+ * backed by a read in that command's branch of the dispatch in `main`
+ * (`flags.top`, `parsed.values.get("by")`, and so on). An option that is not
+ * listed for a command has no code path looking at it, so accepting it would
+ * print a normal report and look like it worked -- which is exactly the trap
+ * `--limit` was already guarded against. Keeping the data here lets the error
+ * message quote the commands that do use the option without drifting.
+ */
+const COMMAND_OPTIONS: Record<string, readonly string[]> = {
+  // top -> fields.toSorted down to N, json at the report. Nothing else.
+  stat: ["top", "json", "skip-invalid", "progress", "out", "quiet"],
+  // lines -> runHead, pretty -> emit, json -> only the "stopped after N" note.
+  head: ["lines", "pretty", "json", "skip-invalid", "progress", "out", "quiet"],
+  filter: [
+    "where",
+    "where-file",
+    "limit",
+    "pretty",
+    "json",
+    "skip-invalid",
+    "progress",
+    "out",
+    "quiet",
+  ],
+  agg: [
+    "by",
+    "count",
+    "sum",
+    "avg",
+    "p95",
+    "where",
+    "where-file",
+    "top",
+    "json",
+    "skip-invalid",
+    "progress",
+    "out",
+    "quiet",
+  ],
+  // No --json: the "row(s) written" footer is unconditional, so accepting it
+  // would promise machine-readable output that never arrives.
+  "to-csv": ["fields", "where", "where-file", "limit", "skip-invalid", "progress", "out", "quiet"],
+  "to-jsonl": [
+    "fields",
+    "where",
+    "where-file",
+    "limit",
+    "pretty",
+    "skip-invalid",
+    "progress",
+    "out",
+    "quiet",
+  ],
+};
+
+/** Every option that has to be justified by a command, in --help order. */
+const SCOPED_OPTIONS: readonly string[] = GLOBAL_OPTIONS.map((option) => option.name).filter(
+  (name) => name !== "help",
+);
+
+/** "a, b and c" -- the same shape the --limit message has always used. */
+function listCommands(names: readonly string[]): string {
+  if (names.length === 1) return names[0]!;
+  return names.slice(0, -1).join(", ") + " and " + names[names.length - 1]!;
+}
+
+/**
+ * Reject options the command never reads.
+ *
+ * The alternative -- accepting them and printing a normal report -- is worse
+ * than an error, because `stat --where 'status >= 500'` returning the whole
+ * file looks like a filter that matched everything.
+ */
+function rejectUnusedOptions(command: string, parsed: ReturnType<typeof parseArgs>): void {
+  const used = new Set(COMMAND_OPTIONS[command]!);
+  for (const option of SCOPED_OPTIONS) {
+    if (used.has(option)) continue;
+    if (!parsed.values.has(option) && !parsed.flags.has(option)) continue;
+    if (option === "version") {
+      throw new ArgError(`--version is not supported by ${command}; it applies to "jlb --version" on its own`);
+    }
+    const accepting = Object.keys(COMMAND_OPTIONS).filter((name) => COMMAND_OPTIONS[name]!.includes(option));
+    throw new ArgError(`--${option} is not supported by ${command}; it applies to ${listCommands(accepting)}`);
+  }
+}
 
 interface CommandConfig {
   lines: number;
@@ -199,11 +295,9 @@ function validateForCommand(
       throw new ArgError(`unknown command: ${command} (try jlb --help)`);
   }
 
-  // --limit only means something where records are streamed out one by one.
-  // Silently ignoring it elsewhere would look like it worked.
-  if (flags.limit !== undefined && !LIMIT_COMMANDS.has(command)) {
-    throw new ArgError(`--limit is not supported by ${command}; it applies to filter, to-csv and to-jsonl`);
-  }
+  // Silently ignoring an option the command never reads would look like it
+  // worked; every scope error comes from COMMAND_OPTIONS, in --help order.
+  rejectUnusedOptions(command, parsed);
   if (flags.limit !== undefined && flags.limit < 0) throw new ArgError("--limit must be >= 0");
   // A non-positive --top used to mean "all rows" in one place and "no fields"
   // in another, which then printed a misleading empty-fields report.

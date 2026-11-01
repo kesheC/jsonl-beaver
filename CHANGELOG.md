@@ -7,6 +7,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **An option the command never reads is now an error, not a no-op.** Only
+  `--limit` was scoped; everything else was accepted and dropped, so
+  `stat --where 'status >= 500'` printed the whole file and `head --by level`
+  printed the first N records, both with exit 0. A table of what each command
+  actually reads now backs the check, and the message names the commands that
+  do take the option: `--where is not supported by stat; it applies to filter,
+  agg, to-csv and to-jsonl`. `--json` is kept where a branch reads it
+  (`stat`; `head`, where it suppresses the stopped-early note; `filter`;
+  `agg`) and rejected on `to-csv`/`to-jsonl`, whose row-count footer is
+  unconditional. `--version` is a standalone command and is rejected
+  everywhere else. `--help` still wins over every other argument.
+
+### Changed
+
+- **`--help` lists which commands read each option** instead of leaving it to
+  the reader to guess, and the `jlb head` usage line now shows the `--json` it
+  has always accepted.
+
 ## [0.1.8] - 2026-11-01
 
 ### Added

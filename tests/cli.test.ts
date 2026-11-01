@@ -250,11 +250,147 @@ describe("argument validation", () => {
     expect(await readFile(file, "utf8")).toBe(before);
   });
 
+  it("treats --version as a standalone command, not a per-command flag", async () => {
+    const result = await runCli(["stat", records, "--version"], { cwd: dir });
+    expect(result.code).toBe(2);
+    expect(result.stderr).toContain("--version is not supported by stat");
+    expect(result.stderr).toContain("jlb --version");
+  });
+
   it("rejects an unknown command before touching the output file", async () => {
     const target = path.join(dir, "nope.out");
     const result = await runCli(["explode", "-o", target, records], { cwd: dir });
     expect(result.code).toBe(2);
     expect(result.stderr).toContain("unknown command");
     await expect(stat(target)).rejects.toMatchObject({ code: "ENOENT" });
+  });
+});
+
+/**
+ * The scope table lives in src/cli.ts, so these expectations are written out by
+ * hand on purpose: a test that imported COMMAND_OPTIONS would agree with
+ * whatever the implementation says, including a typo. The lists below are what
+ * the dispatch in `main` actually reads.
+ */
+describe("a flag the command never reads is rejected, not ignored", () => {
+  const READ: Record<string, string[]> = {
+    stat: ["top", "json", "skip-invalid", "progress", "out", "quiet"],
+    head: ["lines", "pretty", "json", "skip-invalid", "progress", "out", "quiet"],
+    filter: ["where", "where-file", "limit", "pretty", "json", "skip-invalid", "progress", "out", "quiet"],
+    agg: ["by", "count", "sum", "avg", "p95", "where", "where-file", "top", "json", "skip-invalid", "progress", "out", "quiet"],
+    "to-csv": ["fields", "where", "where-file", "limit", "skip-invalid", "progress", "out", "quiet"],
+    "to-jsonl": ["fields", "where", "where-file", "limit", "pretty", "skip-invalid", "progress", "out", "quiet"],
+  };
+  const SCOPED = [
+    "skip-invalid", "json", "progress", "pretty", "version", "top", "limit", "where",
+    "where-file", "by", "count", "sum", "avg", "p95", "fields", "lines", "out", "quiet",
+  ];
+
+  let whereFile = "";
+
+  /** A value each option accepts, so the only thing that can fail is the scope check. */
+  function argsFor(option: string): string[] {
+    switch (option) {
+      case "top":
+      case "limit":
+      case "lines":
+        return ["--" + option, "2"];
+      case "where":
+        return ["--where", "n=1"];
+      case "where-file":
+        return ["--where-file", whereFile];
+      case "by":
+      case "sum":
+      case "avg":
+      case "p95":
+      case "fields":
+        return ["--" + option, "n"];
+      case "out":
+        return ["--out", path.join(dir, "never-written.out")];
+      default:
+        return ["--" + option];
+    }
+  }
+
+  it("rejects every combination outside the table, naming the flag and the commands that take it", async () => {
+    whereFile = await writeText(dir, "predicate.txt", "n = 1\n");
+    const cases: { command: string; option: string }[] = [];
+    for (const command of Object.keys(READ)) {
+      for (const option of SCOPED) {
+        if (!READ[command]!.includes(option)) cases.push({ command, option });
+      }
+    }
+    // 70-odd child processes; run them in batches so the suite stays quick.
+    const results: { command: string; option: string; code: number | null; stderr: string }[] = [];
+    for (let i = 0; i < cases.length; i += 8) {
+      const batch = cases.slice(i, i + 8);
+      const settled = await Promise.all(
+        batch.map(async (item) => {
+          const result = await runCli([item.command, ...argsFor(item.option), records], { cwd: dir });
+          return { ...item, code: result.code, stderr: result.stderr };
+        }),
+      );
+      results.push(...settled);
+    }
+    expect(results.length).toBeGreaterThan(50);
+    for (const result of results) {
+      const label = `${result.command} --${result.option}`;
+      expect.soft(result.code, label + " should be rejected").toBe(2);
+      expect.soft(result.stderr, label + " should name the flag").toContain(
+        `--${result.option} is not supported by ${result.command}`,
+      );
+      expect.soft(result.stderr, label + " should not print a stack").not.toContain("    at ");
+    }
+  });
+
+  it("names the commands that do read the flag", async () => {
+    const cases: [string, string[], string][] = [
+      ["stat", ["--where", "n=1"], "--where is not supported by stat; it applies to filter, agg, to-csv and to-jsonl"],
+      ["head", ["--top", "2"], "--top is not supported by head; it applies to stat and agg"],
+      ["head", ["--where", "n=1"], "--where is not supported by head; it applies to filter, agg, to-csv and to-jsonl"],
+      ["to-csv", ["--json"], "--json is not supported by to-csv; it applies to stat, head, filter and agg"],
+      ["to-jsonl", ["--json"], "--json is not supported by to-jsonl; it applies to stat, head, filter and agg"],
+      ["agg", ["--pretty"], "--pretty is not supported by agg; it applies to head, filter and to-jsonl"],
+      ["filter", ["--top", "2"], "--top is not supported by filter; it applies to stat and agg"],
+    ];
+    for (const [command, args, message] of cases) {
+      const result = await runCli([command, ...args, records], { cwd: dir });
+      expect(result.code).toBe(2);
+      expect(result.stderr.trim()).toBe("jlb: " + message);
+    }
+  });
+
+  it("leaves the -o target alone when a scope error fires", async () => {
+    const target = await writeText(dir, "scope-kept.txt", "keep me\n");
+    const result = await runCli(["stat", "-o", target, "--by", "n", records], { cwd: dir });
+    expect(result.code).toBe(2);
+    expect(result.stderr).toContain("--by is not supported by stat");
+    expect(await readFile(target, "utf8")).toBe("keep me\n");
+    await expect(stat(path.join(dir, "never-written.out"))).rejects.toMatchObject({ code: "ENOENT" });
+  });
+
+  it("still accepts the options each command does read", async () => {
+    const ok: string[][] = [
+      ["stat", "--top", "1", "--json"],
+      ["head", "-n", "1", "--pretty"],
+      ["filter", "--where", "n=1", "--limit", "1", "--json"],
+      ["agg", "--by", "n", "--count", "--where", "n=1", "--top", "1", "--json"],
+      ["to-csv", "--fields", "n", "--where", "n=1", "--limit", "1"],
+      ["to-jsonl", "--fields", "n", "--where", "n=1", "--limit", "1", "--pretty"],
+    ];
+    for (const args of ok) {
+      const result = await runCli([args[0]!, ...args.slice(1), records], { cwd: dir });
+      expect(result.code, args.join(" ")).toBe(0);
+      expect(result.stdout.length, args.join(" ")).toBeGreaterThan(0);
+    }
+  });
+
+  it("keeps --json meaningful on head: it suppresses the stopped-early note", async () => {
+    const withNote = await runCli(["head", "-n", "1", records], { cwd: dir });
+    expect(withNote.stderr).toContain("jlb: stopped after 1 record(s)");
+    const silent = await runCli(["head", "-n", "1", "--json", records], { cwd: dir });
+    expect(silent.code).toBe(0);
+    expect(silent.stderr).toBe("");
+    expect(silent.stdout).toBe(withNote.stdout);
   });
 });
