@@ -7,6 +7,32 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.13] - 2026-11-02
+
+### Changed
+
+> This package has no 0.1.12: the closed-pipe fix it released everywhere else was
+> already here in 0.1.11, so there was nothing to ship under that number.
+
+- **The benchmark transcripts quote only the lines that do not move.** `time` output and the
+  per-field table depended on the machine and on how fast the box was that day; the docs now show
+  `stat | head -10` — which stops right before that table — and give the wall-clock numbers in
+  prose with a note that they will not match. The `filter` transcripts redirect matched lines to
+  a file, because a 1 GB run prints a quarter of a million of them.
+
+### Fixed
+
+- **The changelog described a CI matrix that no longer existed.** Every quality note from 0.1.2
+  onwards said "Node 20 and 22", but the matrix has run 20, 22 and 24 since that release — so each
+  of those sections, and the GitHub release notes generated from them, named a matrix the project
+  had already outgrown. The notes now list the versions CI actually runs.
+
+### Quality
+
+- 171 tests across 9 spec files, 2633 lines of TypeScript.
+- CI matrix: Ubuntu and Windows, Node 20, 22 and 24.
+- Zero runtime dependencies.
+
 ## [0.1.11] - 2026-11-01
 
 ### Fixed
@@ -34,7 +60,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Quality
 
 - 171 tests across 9 spec files, 2633 lines of TypeScript.
-- CI matrix: Ubuntu and Windows, Node 20 and 22.
+- CI matrix: Ubuntu and Windows, Node 20, 22 and 24.
 - Zero runtime dependencies.
 
 ## [0.1.10] - 2026-11-01
@@ -50,7 +76,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Quality
 
 - 166 tests across 9 spec files, 2,590 lines of TypeScript.
-- CI matrix: Ubuntu and Windows, Node 20 and 22.
+- CI matrix: Ubuntu and Windows, Node 20, 22 and 24.
 - Zero runtime dependencies.
 
 ## [0.1.9] - 2026-11-01
@@ -90,7 +116,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Quality
 
 - 164 tests across 9 spec files, 2,568 lines of TypeScript.
-- CI matrix: Ubuntu and Windows, Node 20 and 22.
+- CI matrix: Ubuntu and Windows, Node 20, 22 and 24.
 - Zero runtime dependencies.
 
 ## [0.1.8] - 2026-11-01
@@ -262,7 +288,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Zero runtime dependencies.
 
 [0.1.11]: https://github.com/kesheC/jsonl-beaver/compare/v0.1.10...v0.1.11
-[Unreleased]: https://github.com/kesheC/jsonl-beaver/compare/v0.1.11...HEAD
+[0.1.13]: https://github.com/kesheC/jsonl-beaver/compare/v0.1.11...v0.1.13
+[Unreleased]: https://github.com/kesheC/jsonl-beaver/compare/v0.1.13...HEAD
 [0.1.10]: https://github.com/kesheC/jsonl-beaver/compare/v0.1.9...v0.1.10
 [0.1.9]: https://github.com/kesheC/jsonl-beaver/compare/v0.1.8...v0.1.9
 [0.1.8]: https://github.com/kesheC/jsonl-beaver/compare/v0.1.7...v0.1.8
