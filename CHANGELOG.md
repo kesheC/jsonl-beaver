@@ -7,6 +7,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **`--help` no longer hides a command that does not exist.** `jlb bogus --help`
+  printed the whole usage page and exited 0, answering an unrecognised word as
+  a request for help. The command is now judged before the help flag, so it
+  exits 2 with `jlb: unknown command: bogus (try jlb --help)`.
+- **`--version` is a standalone command, not a per-command flag.** The check
+  existed but ran after the missing-operand check, so `jlb stat --version` was
+  answered with `jlb: stat: missing <file|-> argument` -- blaming the file for a
+  flag that was never going to be read. It now reports `--version is not
+  supported by stat; it applies to "jlb --version" on its own`.
+- **A dash-shaped first word reads as a misspelled option.** `jlb --versoin`
+  answered `unknown command: --versoin`, which sends the reader looking for a
+  subcommand instead of at the spelling of the flag.
+
 ## [0.1.10] - 2026-11-01
 
 ### Fixed

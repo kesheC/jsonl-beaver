@@ -251,10 +251,12 @@ describe("argument validation", () => {
   });
 
   it("treats --version as a standalone command, not a per-command flag", async () => {
-    const result = await runCli(["stat", records, "--version"], { cwd: dir });
-    expect(result.code).toBe(2);
-    expect(result.stderr).toContain("--version is not supported by stat");
-    expect(result.stderr).toContain("jlb --version");
+    for (const argv of [["stat", records, "--version"], ["stat", "--version"]]) {
+      const result = await runCli(argv, { cwd: dir });
+      expect(result.code, argv.join(" ")).toBe(2);
+      expect(result.stderr, argv.join(" ")).toContain("--version is not supported by stat");
+      expect(result.stderr, argv.join(" ")).toContain("jlb --version");
+    }
   });
 
   it("rejects an unknown command before touching the output file", async () => {
@@ -281,6 +283,28 @@ describe("argument validation", () => {
     const result = await runCli(["stat"], { cwd: dir });
     expect(result.code).toBe(2);
     expect(result.stderr).toContain("stat: missing <file|-> argument");
+  });
+
+  // Regression: `jlb bogus --help` printed the whole usage page and exited 0,
+  // so a misspelled command was answered as a request for help.
+  it("does not let --help hide a command that does not exist", async () => {
+    for (const argv of [["bogus", "--help"], ["bogus", "-h"], ["bogus", "--help", records]]) {
+      const result = await runCli(argv, { cwd: dir });
+      expect(result.code, argv.join(" ")).toBe(2);
+      expect(result.stdout, argv.join(" ")).toBe("");
+      expect(result.stderr, argv.join(" ")).toContain("unknown command: bogus");
+    }
+  });
+
+  // Regression: a dash-shaped first word was reported as an unknown *command*,
+  // which sends the reader looking for a subcommand instead of at the spelling.
+  it("reads a dash-shaped first word as a misspelled option", async () => {
+    for (const argv of [["--bogus"], ["--versoin"], ["-Q"]]) {
+      const result = await runCli(argv, { cwd: dir });
+      expect(result.code, argv.join(" ")).toBe(2);
+      expect(result.stderr, argv.join(" ")).toContain("unknown option: " + argv[0]);
+      expect(result.stderr, argv.join(" ")).not.toContain("unknown command");
+    }
   });
 });
 

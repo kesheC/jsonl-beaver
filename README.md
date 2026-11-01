@@ -119,13 +119,17 @@ Every command takes a file path **or `-` for stdin**, and every command is
 streaming — you can pipe into `head` and it stops reading.
 
 A command name that does not exist is reported as such, before anything is said
-about its arguments:
+about its arguments — and `--help` does not make it disappear:
 
 ```text
 $ jlb bogus
 jlb: unknown command: bogus (try jlb --help)
+$ jlb bogus --help
+jlb: unknown command: bogus (try jlb --help)
 $ jlb stat
 jlb: stat: missing <file|-> argument
+$ jlb --versoin
+jlb: unknown option: --versoin (try jlb --help)
 ```
 
 ### `jlb stat` — what is in this file?
@@ -658,13 +662,17 @@ upstream   20,000  100.0%  object:100%
 每个命令都接受文件路径**或 `-` 表示 stdin**，且全部是流式的 —— 管道接
 `head` 时会立刻停止读取。
 
-命令名写错时报的是命令名，而不是先抱怨参数：
+命令名写错时报的是命令名，而不是先抱怨参数 —— 而且 `--help` 不会让它消失：
 
 ```text
 $ jlb bogus
 jlb: unknown command: bogus (try jlb --help)
+$ jlb bogus --help
+jlb: unknown command: bogus (try jlb --help)
 $ jlb stat
 jlb: stat: missing <file|-> argument
+$ jlb --versoin
+jlb: unknown option: --versoin (try jlb --help)
 ```
 
 ### `jlb stat` —— 这个文件里有什么？

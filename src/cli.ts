@@ -292,6 +292,12 @@ function unknownCommandMessage(command: string): string {
  */
 function assertKnownCommand(command: string): void {
   if (Object.hasOwn(COMMAND_OPTIONS, command)) return;
+  // A dash-shaped first word is a misspelled option, not a misspelled command:
+  // `jlb --versoin` answered "unknown command: --versoin", which sends the
+  // reader looking for a subcommand instead of at the spelling of the flag.
+  if (command.startsWith("-")) {
+    throw new ArgError(`unknown option: ${command} (try jlb --help)`);
+  }
   throw new ArgError(unknownCommandMessage(command));
 }
 
@@ -373,16 +379,23 @@ async function main(argv: readonly string[]): Promise<number> {
   }
 
   const parsed = parseArgs(argv.slice(1), GLOBAL_OPTIONS);
+  // The command is judged before its arguments: a typo in the command name
+  // should not come back as "you forgot the file". It is also judged before
+  // --help, which used to answer `jlb bogus --help` with the whole usage page
+  // and exit 0 -- an unrecognised word answered as if it had been read.
+  assertKnownCommand(command);
+  // --version is a question about the tool, not about the run: `jlb stat
+  // --version` answered "missing <file|-> argument", which blames the file for
+  // a flag that was never going to be read.
+  if (parsed.flags.has("version")) {
+    throw new ArgError(`--version is not supported by ${command}; it applies to "jlb --version" on its own`);
+  }
   if (parsed.flags.has("help")) {
     process.stdout.write(HELP);
     return 0;
   }
   const flags = readGlobals(parsed);
   const quiet = parsed.flags.has("quiet");
-
-  // The command is judged before its arguments: a typo in the command name
-  // should not come back as "you forgot the file".
-  assertKnownCommand(command);
 
   const input = parsed.positionals[0];
   if (input === undefined) throw new ArgError(`${command}: missing <file|-> argument`);
