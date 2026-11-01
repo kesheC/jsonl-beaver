@@ -277,6 +277,24 @@ interface CommandConfig {
  * a bad flag combination, a missing input or a malformed --where all exit 2
  * with the target file untouched.
  */
+/** One wording for the one situation an unknown command can be met. */
+function unknownCommandMessage(command: string): string {
+  return `unknown command: ${command} (try jlb --help)`;
+}
+
+/**
+ * Name an unknown command before judging anything else about the invocation.
+ *
+ * The command is what decides which of the remaining arguments are meaningful,
+ * so the order of the complaints matters: `jlb bogus` used to be answered with
+ * "bogus: missing <file|-> argument", which reads as "the command was fine,
+ * you just forgot the file" and never says the command does not exist.
+ */
+function assertKnownCommand(command: string): void {
+  if (Object.hasOwn(COMMAND_OPTIONS, command)) return;
+  throw new ArgError(unknownCommandMessage(command));
+}
+
 function validateForCommand(
   command: string,
   parsed: ReturnType<typeof parseArgs>,
@@ -292,7 +310,7 @@ function validateForCommand(
     case "to-jsonl":
       break;
     default:
-      throw new ArgError(`unknown command: ${command} (try jlb --help)`);
+      throw new ArgError(unknownCommandMessage(command));
   }
 
   // Silently ignoring an option the command never reads would look like it
@@ -361,6 +379,10 @@ async function main(argv: readonly string[]): Promise<number> {
   }
   const flags = readGlobals(parsed);
   const quiet = parsed.flags.has("quiet");
+
+  // The command is judged before its arguments: a typo in the command name
+  // should not come back as "you forgot the file".
+  assertKnownCommand(command);
 
   const input = parsed.positionals[0];
   if (input === undefined) throw new ArgError(`${command}: missing <file|-> argument`);
@@ -514,7 +536,7 @@ async function main(argv: readonly string[]): Promise<number> {
       }
 
       default:
-        throw new ArgError(`unknown command: ${command} (try jlb --help)`);
+        throw new ArgError(unknownCommandMessage(command));
       }
     })();
   } catch (error) {

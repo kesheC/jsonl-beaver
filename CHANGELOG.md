@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **A misspelled command is reported as a misspelled command.** `jlb bogus` was
+  answered with `jlb: bogus: missing <file|-> argument`, which reads as "the
+  command is fine, you forgot the operand" and never says the command does not
+  exist; the real message only appeared once a file was also supplied. The
+  command name is now judged before its arguments.
+
 ## [0.1.9] - 2026-11-01
 
 ### Added

@@ -264,6 +264,24 @@ describe("argument validation", () => {
     expect(result.stderr).toContain("unknown command");
     await expect(stat(target)).rejects.toMatchObject({ code: "ENOENT" });
   });
+
+  // Regression: `jlb bogus` with no file was answered with
+  // "bogus: missing <file|-> argument", which reads as a fine command with a
+  // forgotten operand and never says the command does not exist.
+  it("names the command, not the missing file, when the command itself is wrong", async () => {
+    for (const argv of [["bogus"], ["bogus", records], ["bogus", "-o", path.join(dir, "x.out"), records]]) {
+      const result = await runCli(argv, { cwd: dir });
+      expect(result.code, argv.join(" ")).toBe(2);
+      expect(result.stderr, argv.join(" ")).toContain("unknown command: bogus");
+      expect(result.stderr, argv.join(" ")).not.toContain("missing <file|->");
+    }
+  });
+
+  it("still reports a missing file for a command that does exist", async () => {
+    const result = await runCli(["stat"], { cwd: dir });
+    expect(result.code).toBe(2);
+    expect(result.stderr).toContain("stat: missing <file|-> argument");
+  });
 });
 
 /**
