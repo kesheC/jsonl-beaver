@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.9] - 2026-11-01
+
+### Added
+
+- **The Chinese README covers the same ground as the English one.** The usage
+  section gained the eighteen lines of real `jlb head` output the English text
+  already showed, plus the warning against installing from `git+https://` and
+  the section separators that were missing. 2,278 CJK characters, up from
+  2,093.
+
 ### Fixed
 
 - **An option the command never reads is now an error, not a no-op.** Only
@@ -20,12 +30,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `agg`) and rejected on `to-csv`/`to-jsonl`, whose row-count footer is
   unconditional. `--version` is a standalone command and is rejected
   everywhere else. `--help` still wins over every other argument.
+- **The 0.1.8 entry claimed three guards the old test never had.** None of the
+  three was asserted at v0.1.7; they are new, not restored. Version headings
+  had no link definitions, so `[0.1.7]` and `[0.1.8]` rendered as literal text,
+  and `[Unreleased]` still compared against v0.1.6.
 
 ### Changed
 
 - **`--help` lists which commands read each option** instead of leaving it to
   the reader to guess, and the `jlb head` usage line now shows the `--json` it
   has always accepted.
+
+### Quality
+
+- 164 tests across 9 spec files, 2,568 lines of TypeScript.
+- CI matrix: Ubuntu and Windows, Node 20 and 22.
+- Zero runtime dependencies.
 
 ## [0.1.8] - 2026-11-01
 
@@ -195,7 +215,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - CI matrix: Ubuntu and Windows, Node 20 and 22.
 - Zero runtime dependencies.
 
-[Unreleased]: https://github.com/kesheC/jsonl-beaver/compare/v0.1.8...HEAD
+[Unreleased]: https://github.com/kesheC/jsonl-beaver/compare/v0.1.9...HEAD
+[0.1.9]: https://github.com/kesheC/jsonl-beaver/compare/v0.1.8...v0.1.9
 [0.1.8]: https://github.com/kesheC/jsonl-beaver/compare/v0.1.7...v0.1.8
 [0.1.7]: https://github.com/kesheC/jsonl-beaver/compare/v0.1.6...v0.1.7
 [0.1.6]: https://github.com/kesheC/jsonl-beaver/compare/v0.1.5...v0.1.6
