@@ -7,6 +7,62 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.7] - 2026-11-01
+
+### Fixed
+
+- **`-o` no longer truncates an existing file on a rejected run.** The output
+  sink wrote straight to the target, so a run that failed halfway had already
+  destroyed what was there. It now writes a temp file and renames on success,
+  and writing over the input file is refused outright.
+- **A closed stderr pipe no longer kills the run.** `jlb to-csv ... 2>&1 |
+  head -2` turned stderr writes into an unhandled `EPIPE` event, terminating
+  the process before `commit()` — a false non-zero exit plus a stray
+  `.jlb-tmp`. The guard is now on both pipes: stdout ends the run successfully
+  (the reader has what it asked for), stderr is logging and is swallowed.
+- **Temp files survive a hard kill.** A registry removes them on SIGINT and
+  SIGTERM, and because Windows kills a process without running JavaScript, the
+  next run sweeps leftovers whose owning pid is gone.
+- **Arguments are validated before the input is opened.** `--limit` scope,
+  `--top >= 1`, required `--fields`/`--where`, and one agg metric at a time all
+  fail as exit 2 with one line, not as a Node stack after the file was read.
+- **`--fields` is validated by the same path parser `--by` uses**, and a bad
+  `--by` is exit 2 instead of an uncaught error with exit 1.
+- **Prototype-named fields no longer leak.** Field lookup uses
+  `Object.hasOwn`, so `filter --where constructor` stopped matching every
+  record and `agg --by` no longer crashes on a prototype key.
+- **Malformed-line reports name the physical line** and only claim 'skipping'
+  when `--skip-invalid` is actually on.
+- **`-o` trims surrounding whitespace**, so it cannot miss the self-overwrite
+  guard or create a sibling file ending in a space.
+
+### Changed
+
+- **The tarball no longer ships dead sourcemaps.** `sourceMap` and
+  `declarationMap` are off in `tsconfig.build.json`; the maps had no
+  `sourcesContent` and pointed at `src/*.ts`, which `files` does not publish,
+  so every one was a dead link: 33 to 23 entries, 213,298 to 137,519 bytes
+  unpacked.
+- **Every README example is reproducible from a fresh clone.** The pipe and
+  self-overwrite examples referenced `d.jsonl` / `half.jsonl` / `data.jsonl`,
+  which the repo never ships; they now derive from `demo/access.jsonl` with the
+  fixture-creating line shown inline, and the malformed-line sections gained
+  the `printf` that writes the bad file.
+- The benchmark row and the rough edges of `--sum`, `p95` and `-o` are
+  documented: `--sum` ignores non-numeric values instead of counting them as
+  zero, `p95` beyond the 4,096-observation reservoir can be a fraction of a
+  percent off, the CLI writes LF while the `toCsv` helper defaults to CRLF,
+  and `--limit` applies only to the three commands that use it.
+- `--fields` treats a doubled or trailing comma as a mistyped list and drops
+  the empty segment, in the source and in both README languages.
+
+### Security
+
+- The release job refuses to publish when the tag and `package.json`
+  disagree, and CI now parses `npm pack --dry-run --json` to assert the dist
+  entry points, no leaked `tests/`/`src/`/`node_modules/` prefixes and no
+  `.js.map`, then imports the installed package and checks its exports.
+
 ## [0.1.6] - 2026-11-01
 
 ### Fixed
