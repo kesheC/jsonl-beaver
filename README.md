@@ -359,7 +359,7 @@ writes the same shape to stdout, so a wrapper parses one thing and never has to
 guess from an empty stream:
 
 ```text
-$ jlb stat --json ./missing.jsonl; echo "exit=$?"
+$ jlb stat --json ./missing.jsonl 2>/dev/null; echo "exit=$?"
 {
   "error": {
     "message": "no such file: ./missing.jsonl",
@@ -448,10 +448,11 @@ generator is seeded. The wall-clock times are not: they were taken on an idle
 box, and a loaded machine will be slower. Compare your own runs to each other,
 not to this row.
 
-`stat` on the 1 GB file:
+`stat` on the 1 GB file. `head -10` stops right before the per-field table that
+`stat` prints next, so the transcript below is stable on any machine:
 
 ```text
-$ time jlb stat bench-1gb.jsonl
+$ jlb stat bench-1gb.jsonl | head -10
 Summary
   lines         4,567,729
   valid         4,567,729
@@ -462,18 +463,22 @@ Summary
 
 Line length (chars)
   p50 234   p95 242   max 247
-
-real    0m11.583s
 ```
 
-And a filtered pass over the same 1 GB (9.05 s, 138.9 MiB peak RSS):
+`time` is a bash builtin and prints three tab-separated lines (`real`/`user`/`sys`),
+so the wall-clock column comes from `TIMEFORMAT='real    %R s'; time jlb stat
+bench-1gb.jsonl > /dev/null`. The seconds will not match the table exactly.
+
+And a filtered pass over the same 1 GB. The matching rows go to stdout, so the
+transcript redirects them into a file; the summary line is what `filter` writes
+to stderr:
 
 ```text
-$ time jlb filter bench-1gb.jsonl --where "status>=500 and dur>500"
+$ jlb filter bench-1gb.jsonl --where "status>=500 and dur>500" > hits.jsonl
 jlb: 291,093 matched of 4,567,729 scanned
-
-real    0m9.054s
 ```
+
+That pass took 9.05 s with a 138.9 MiB peak RSS on the machine in the table.
 
 Ten times more data costs about 45 MiB more memory. That is the whole design goal.
 
@@ -981,10 +986,10 @@ npm run bench -- --out bench-1gb.jsonl --gb 1
 那是在空载机器上测的，机器一忙就会变慢。请用你自己几次运行的相对值比较，
 而不是拿绝对秒数对照这张表。
 
-对 1 GB 文件跑 `stat`：
+对 1 GB 文件跑 `stat`。`head -10` 正好停在紧随其后的字段表之前，所以下面这段转录在任何机器上都一致：
 
 ```text
-$ time jlb stat bench-1gb.jsonl
+$ jlb stat bench-1gb.jsonl | head -10
 Summary
   lines         4,567,729
   valid         4,567,729
@@ -995,18 +1000,18 @@ Summary
 
 Line length (chars)
   p50 234   p95 242   max 247
-
-real    0m11.583s
 ```
 
-对同一个 1 GB 文件跑一次带过滤的扫描（9.05 s，峰值 138.9 MiB）：
+`time` 是 bash 内建，默认打 `real`/`user`/`sys` 三行（TAB 分隔）；表格里那一列用 `TIMEFORMAT='real    %R s'; time jlb stat bench-1gb.jsonl > /dev/null` 得到，秒数不会与表格完全一致。
+
+对同一个 1 GB 文件跑一次带过滤的扫描。匹配行走 stdout，所以转录里把它们重定向进了文件；汇总那一句是 `filter` 写到 stderr 的：
 
 ```text
-$ time jlb filter bench-1gb.jsonl --where "status>=500 and dur>500"
+$ jlb filter bench-1gb.jsonl --where "status>=500 and dur>500" > hits.jsonl
 jlb: 291,093 matched of 4,567,729 scanned
-
-real    0m9.054s
 ```
+
+在表格那台机器上这次扫描耗时 9.05 s，峰值 RSS 138.9 MiB。
 
 数据量翻十倍，内存只多用了约 45 MiB。这就是整个设计目标。
 
