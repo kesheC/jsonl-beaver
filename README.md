@@ -534,6 +534,8 @@ MIT — see [LICENSE](LICENSE). Copyright (c) 2026 kesheC.
 
 你真正想要的是：**流式读取、内存有界、随手过滤和聚合**。这就是 `jlb`。
 
+---
+
 ## 安装
 
 `jsonl-beaver` **没有发布到 npm registry**。这个名字目前还是空的，只是本项目还没有发布凭据。
@@ -565,6 +567,11 @@ npm ci && npm run build && npm link
 ```
 
 需要 Node >= 20.11。**零运行时依赖** —— 只用 Node 标准库。
+
+> 不要用 `npm install -g git+https://github.com/...`：仓库里没有构建产物，
+> 而全局安装会跳过 `devDependencies`，因此根本没有 `tsc` 可以拿来构建。
+
+---
 
 ## 60 秒上手
 
@@ -614,6 +621,8 @@ upstream   20,000  100.0%  object:100%
 
 一遍扫描，不需要索引、不需要 schema、不需要任何配置文件。
 
+---
+
 ## 用法
 
 每个命令都接受文件路径**或 `-` 表示 stdin**，且全部是流式的 —— 管道接
@@ -637,6 +646,27 @@ jlb head <file|-> [-n 10] [--pretty]
 
 ```bash
 jlb head demo/access.jsonl -n 1 --pretty
+```
+
+```json
+{
+  "ts": "2026-10-01T00:00:00.000Z",
+  "level": "info",
+  "status": 404,
+  "method": "POST",
+  "path": "/api/cart",
+  "dur": 882,
+  "bytes": 26696,
+  "client_ip": "10.119.61.141",
+  "req": {
+    "id": "r000000",
+    "ua": "curl/8.4.0"
+  },
+  "upstream": {
+    "host": "api-a",
+    "attempts": 1
+  }
+}
 ```
 
 取够 N 条立刻停止读取，所以在 1 GB 文件上也是瞬间返回。
@@ -832,6 +862,8 @@ jlb: skipping line 2: Expected property name or '}'
      {oops
 ```
 
+---
+
 ## 实现要点
 
 - **一遍扫描、内存有界。** `node:readline` 消费 `createReadStream`，逐行解码。
@@ -892,6 +924,8 @@ real    0m9.054s
 
 数据量翻十倍，内存只多用了约 45 MiB。这就是整个设计目标。
 
+---
+
 ## 库 API
 
 流式引擎以库的形式导出，可以直接嵌入而不必起子进程。`src/index.ts` 从不读取
@@ -932,6 +966,8 @@ const { groups } = await runAgg("demo/access.jsonl", { by: "path", sum: "bytes",
 | `csvEscape` / `toCsv` / `renderStat` / `renderAgg` | 格式化工具 |
 | `StatAccumulator` / `Aggregator` / `LengthHistogram` / `Reservoir` | 构建模块 |
 
+---
+
 ## FAQ / 边界
 
 **会把整个文件读进内存吗？** 不会。逐行流式处理，4 GB 文件和 4 MB 文件占用同样
@@ -964,10 +1000,14 @@ p95 是 190,000，`jlb agg --p95 v` 给出 191,240，偏高约 0.6%，重复运�
 而且过滤语言需要真正花时间学。`jlb` 用通用表达力换取日志场景里每天都要用的
 那几个操作，并给出一个可预测的内存上限。
 
+---
+
 ## 安全与变更
 
 发现安全问题请**不要**开公开 issue —— [SECURITY.md](SECURITY.md) 说明了私密上报渠道以及
 需要提供哪些信息。每个版本的改动都记在 [CHANGELOG.md](CHANGELOG.md)。
+
+---
 
 ## 许可证
 
