@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.14] - 2026-11-02
+
 ### Added
 
 - **The files GitHub looks for on a healthy repository.** The repository had issue templates and
@@ -46,6 +48,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   string to a `number` inside `tests/` — a type error the gate exists to catch — came back clean.
   The typecheck config now includes `tests`; `tsconfig.build.json` already carried its own
   `rootDir`, so the published build was never affected.
+
+### Quality
+
+- 171 tests across 9 spec files, 2633 lines of TypeScript.
+- CI matrix: Ubuntu and Windows, Node 20, 22 and 24.
+- Zero runtime dependencies.
 
 ## [0.1.13] - 2026-11-02
 
@@ -329,7 +337,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 [0.1.11]: https://github.com/kesheC/jsonl-beaver/compare/v0.1.10...v0.1.11
 [0.1.13]: https://github.com/kesheC/jsonl-beaver/compare/v0.1.11...v0.1.13
-[Unreleased]: https://github.com/kesheC/jsonl-beaver/compare/v0.1.13...HEAD
+[0.1.14]: https://github.com/kesheC/jsonl-beaver/compare/v0.1.13...v0.1.14
+[Unreleased]: https://github.com/kesheC/jsonl-beaver/compare/v0.1.14...HEAD
 [0.1.10]: https://github.com/kesheC/jsonl-beaver/compare/v0.1.9...v0.1.10
 [0.1.9]: https://github.com/kesheC/jsonl-beaver/compare/v0.1.8...v0.1.9
 [0.1.8]: https://github.com/kesheC/jsonl-beaver/compare/v0.1.7...v0.1.8
