@@ -19,6 +19,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   through the same library calls the CLI uses (`collectStat`, `runHead`, `runFilter`, `runAgg`,
   `renderStat`, `renderAgg`, `prettyJson`), and asserts the README contains the rendered text
   verbatim.
+- **The contributing guide still said the README transcripts are not re-run by CI.** That
+  stopped being true when `tests/readme.test.ts` landed: it regenerates `demo/access.jsonl` and
+  rebuilds the `stat`, `head`, `filter` and `agg` blocks through the library calls the CLI
+  uses. The guide now says which blocks are under test and which were checked by hand.
 
 ## [0.1.14] - 2026-11-02
 
