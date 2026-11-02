@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.15] - 2026-11-02
+
 ### Fixed
 
 - **The README quoted a generated access log nobody re-checked.** Every block on the page — the
@@ -23,6 +25,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   stopped being true when `tests/readme.test.ts` landed: it regenerates `demo/access.jsonl` and
   rebuilds the `stat`, `head`, `filter` and `agg` blocks through the library calls the CLI
   uses. The guide now says which blocks are under test and which were checked by hand.
+
+### Quality
+
+- 175 tests across 10 spec files, 2633 lines of TypeScript.
+- CI matrix: Ubuntu and Windows, Node 20, 22 and 24.
+- Zero runtime dependencies.
+
 
 ## [0.1.14] - 2026-11-02
 
@@ -355,7 +364,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 [0.1.11]: https://github.com/kesheC/jsonl-beaver/compare/v0.1.10...v0.1.11
 [0.1.13]: https://github.com/kesheC/jsonl-beaver/compare/v0.1.11...v0.1.13
 [0.1.14]: https://github.com/kesheC/jsonl-beaver/compare/v0.1.13...v0.1.14
-[Unreleased]: https://github.com/kesheC/jsonl-beaver/compare/v0.1.14...HEAD
+[0.1.15]: https://github.com/kesheC/jsonl-beaver/compare/v0.1.14...v0.1.15
+[Unreleased]: https://github.com/kesheC/jsonl-beaver/compare/v0.1.15...HEAD
 [0.1.10]: https://github.com/kesheC/jsonl-beaver/compare/v0.1.9...v0.1.10
 [0.1.9]: https://github.com/kesheC/jsonl-beaver/compare/v0.1.8...v0.1.9
 [0.1.8]: https://github.com/kesheC/jsonl-beaver/compare/v0.1.7...v0.1.8
