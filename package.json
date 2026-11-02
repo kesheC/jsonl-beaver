@@ -1,6 +1,6 @@
 {
   "name": "jsonl-beaver",
-  "version": "0.1.21",
+  "version": "0.1.22",
   "description": "jlb — streaming JSONL log analytics. Zero-dependency CLI for gigabyte NDJSON logs.",
   "type": "module",
   "bin": {
@@ -27,6 +27,8 @@
     "build": "npm run clean && tsc -p tsconfig.build.json",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
+    "precoverage": "npm run build",
+    "coverage": "vitest run --coverage",
     "dev": "npm run build && node dist/cli.js",
     "demo": "node demo/make-access-log.mjs",
     "bench": "node demo/make-bench.mjs",
@@ -49,7 +51,8 @@
   },
   "devDependencies": {
     "@types/node": "^22.10.2",
-    "typescript": "^5.7.2",
+    "@vitest/coverage-v8": "^4.1.12",
+    "typescript": "^7.0.2",
     "vitest": "^4.1.12"
   },
   "author": "kesheC",

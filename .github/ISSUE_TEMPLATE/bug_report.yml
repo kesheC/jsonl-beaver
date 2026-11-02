@@ -62,7 +62,7 @@ body:
     attributes:
       label: jsonl-beaver version
       description: The output of `jlb --version`.
-      placeholder: 0.1.21
+      placeholder: x.y.z (paste what --version prints)
     validations:
       required: true
 
