@@ -41,6 +41,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   for a check that never runs. The paragraph now says the transcripts are verified by hand and
   asks for the exact command and its output instead.
 
+- **`npm run typecheck` never opened a single test file.** `tsconfig.json` included `src` only,
+  while `CONTRIBUTING.md` described the command as "tsc --noEmit, tests included". Assigning a
+  string to a `number` inside `tests/` — a type error the gate exists to catch — came back clean.
+  The typecheck config now includes `tests`; `tsconfig.build.json` already carried its own
+  `rootDir`, so the published build was never affected.
+
 ## [0.1.13] - 2026-11-02
 
 ### Changed
