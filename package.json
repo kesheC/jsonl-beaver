@@ -27,7 +27,7 @@
     "build": "npm run clean && tsc -p tsconfig.build.json",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
-    "dev": "node --experimental-strip-types src/cli.ts",
+    "dev": "npm run build && node dist/cli.js",
     "demo": "node demo/make-access-log.mjs",
     "bench": "node demo/make-bench.mjs",
     "prepack": "npm run build"
