@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **The README quoted a generated access log nobody re-checked.** Every block on the page — the
+  `stat` summary, the pretty-printed first record, the `2 matched of 12 scanned` footer, the
+  status distribution, the p95 table, the per-upstream averages — describes `demo/access.jsonl`,
+  which is not committed: it is written by `demo/make-access-log.mjs` from a fixed seed. Changing
+  one entry in the generator's pool of paths moves the p50, the group counts and the top-five
+  table, and the README keeps quoting the old run while every gate stays green.
+  `tests/readme.test.ts` regenerates the log the way the quick start does, derives each block
+  through the same library calls the CLI uses (`collectStat`, `runHead`, `runFilter`, `runAgg`,
+  `renderStat`, `renderAgg`, `prettyJson`), and asserts the README contains the rendered text
+  verbatim.
+
 ## [0.1.14] - 2026-11-02
 
 ### Added
