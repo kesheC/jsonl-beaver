@@ -6,3 +6,7 @@
 *.yml text eol=lf
 *.md text eol=lf
 *.js text eol=lf
+
+# The lockfile is text: without this line git can decide it is binary and
+# a dependency change shows up as "Binary files differ" with no diff to read.
+package-lock.json text eol=lf
