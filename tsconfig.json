@@ -10,8 +10,8 @@
     "noUncheckedIndexedAccess": true,
     "declaration": true,
     "sourceMap": true,
-    "outDir": "dist",
     "esModuleInterop": true,
+    "noEmit": true,
     "skipLibCheck": true,
     "forceConsistentCasingInFileNames": true
   },
